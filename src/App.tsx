@@ -1050,11 +1050,6 @@ function DashboardView({
       </div>
 
       <section className="surface chart-card">
-        <SectionTitle icon={Scale} title="Peso del mes" />
-        <WeightChart checkIns={sortedMonthCheckIns} />
-      </section>
-
-      <section className="surface chart-card">
         <SectionTitle icon={BarChart3} title="Peso total" />
         <WeightChart checkIns={checkIns} />
       </section>
