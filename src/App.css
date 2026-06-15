@@ -139,7 +139,7 @@
 
 .sync-panel.login {
   display: grid;
-  grid-template-columns: 18px minmax(180px, 260px) auto;
+  grid-template-columns: 18px minmax(170px, 230px) minmax(140px, 190px) auto auto;
 }
 
 .sync-panel.login small {
@@ -891,6 +891,11 @@ select:disabled {
   padding: 0 14px;
 }
 
+.secondary-button.compact {
+  width: auto;
+  padding: 0 12px;
+}
+
 .secondary-button,
 .icon-button {
   background: var(--surface);
@@ -1131,7 +1136,7 @@ select:disabled {
   }
 
   .sync-panel.login {
-    grid-template-columns: 18px minmax(0, 1fr) 62px;
+    grid-template-columns: 18px minmax(0, 1fr) 72px;
     gap: 8px;
   }
 
@@ -1140,9 +1145,35 @@ select:disabled {
     font-size: 16px;
   }
 
-  .sync-panel.login .primary-button.compact {
+  .sync-panel.login input:first-of-type {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .sync-panel.login input:last-of-type {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .sync-panel.login .primary-button.compact,
+  .sync-panel.login .secondary-button.compact {
     min-height: 38px;
-    padding: 0 9px;
+    padding: 0 8px;
+    font-size: 12px;
+  }
+
+  .sync-panel.login .primary-button.compact {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
+  .sync-panel.login .secondary-button.compact {
+    grid-column: 3;
+    grid-row: 2;
+  }
+
+  .sync-panel.login small {
+    grid-column: 2 / -1;
   }
 
   .sync-panel.muted {

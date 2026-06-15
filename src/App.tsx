@@ -34,6 +34,7 @@ import {
   saveRemoteState,
   signInWithEmail,
   signOut,
+  signUpWithEmail,
   type SyncSession,
 } from './supabase'
 import type {
@@ -118,6 +119,7 @@ function App() {
   const [isLoaded, setIsLoaded] = useState(false)
   const [session, setSession] = useState<SyncSession | null>(null)
   const [syncEmail, setSyncEmail] = useState('')
+  const [syncPassword, setSyncPassword] = useState('')
   const [syncMessage, setSyncMessage] = useState('')
   const [syncStatus, setSyncStatus] = useState<'local' | 'loading' | 'synced' | 'sent' | 'error'>('local')
   const [syncCooldown, setSyncCooldown] = useState(0)
@@ -312,15 +314,22 @@ function App() {
 
   const requestSyncLink = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (!syncEmail.trim() || syncCooldown > 0) {
+    if (!syncEmail.trim() || !syncPassword || syncCooldown > 0) {
       return
     }
 
+    const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null
+    const intent = submitter?.value === 'signup' ? 'signup' : 'signin'
+
     try {
       setSyncStatus('loading')
-      await signInWithEmail(syncEmail.trim())
+      if (intent === 'signup') {
+        await signUpWithEmail(syncEmail.trim(), syncPassword)
+      } else {
+        await signInWithEmail(syncEmail.trim(), syncPassword)
+      }
       setSyncStatus('sent')
-      setSyncMessage('Revisa tu correo.')
+      setSyncMessage(intent === 'signup' ? 'Cuenta creada.' : '')
     } catch (error) {
       console.error('Could not request magic link', error)
       setSyncStatus('error')
@@ -332,7 +341,17 @@ function App() {
         return
       }
 
-      setSyncMessage(errorMessage)
+      if (errorMessage.toLowerCase().includes('invalid login credentials')) {
+        setSyncMessage('Correo o contraseña incorrectos.')
+        return
+      }
+
+      if (errorMessage.toLowerCase().includes('already registered')) {
+        setSyncMessage('Ese correo ya tiene cuenta. Usa Entrar.')
+        return
+      }
+
+      setSyncMessage(errorMessage.replace('Signup', 'Registro'))
     }
   }
 
@@ -522,8 +541,10 @@ function App() {
           email={syncEmail}
           isConfigured={isSupabaseConfigured}
           message={syncMessage}
+          password={syncPassword}
           session={session}
           setEmail={setSyncEmail}
+          setPassword={setSyncPassword}
           signOut={disconnectSync}
           status={syncStatus}
           submit={requestSyncLink}
@@ -834,8 +855,10 @@ function SyncPanel({
   email,
   isConfigured,
   message,
+  password,
   session,
   setEmail,
+  setPassword,
   signOut: disconnect,
   status,
   submit,
@@ -844,8 +867,10 @@ function SyncPanel({
   email: string
   isConfigured: boolean
   message: string
+  password: string
   session: SyncSession | null
   setEmail: Dispatch<SetStateAction<string>>
+  setPassword: Dispatch<SetStateAction<string>>
   signOut: () => void
   status: 'local' | 'loading' | 'synced' | 'sent' | 'error'
   submit: (event: FormEvent<HTMLFormElement>) => void
@@ -878,13 +903,24 @@ function SyncPanel({
       <Mail size={17} />
       <input
         aria-label="Email"
-        placeholder="email para sincronizar"
+        placeholder="email"
         type="email"
         value={email}
         onChange={(event) => setEmail(event.target.value)}
       />
-      <button className="primary-button compact" disabled={status === 'loading' || syncCooldown > 0} type="submit">
-        {syncCooldown > 0 ? `${syncCooldown}s` : 'Sync'}
+      <input
+        aria-label="Contraseña"
+        minLength={6}
+        placeholder="contraseña"
+        type="password"
+        value={password}
+        onChange={(event) => setPassword(event.target.value)}
+      />
+      <button className="primary-button compact" disabled={status === 'loading' || syncCooldown > 0} type="submit" value="signin">
+        {syncCooldown > 0 ? `${syncCooldown}s` : 'Entrar'}
+      </button>
+      <button className="secondary-button compact" disabled={status === 'loading' || syncCooldown > 0} type="submit" value="signup">
+        Crear
       </button>
       {message && <small>{message}</small>}
     </form>

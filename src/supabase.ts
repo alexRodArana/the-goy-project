@@ -90,20 +90,36 @@ export const onAuthChange = (callback: (session: Session | null) => void) => {
   return () => subscription.unsubscribe()
 }
 
-export const signInWithEmail = async (email: string) => {
+export const signInWithEmail = async (email: string, password: string) => {
   if (!supabase) {
     throw new Error('Supabase is not configured')
   }
 
-  const { error } = await supabase.auth.signInWithOtp({
+  const { error } = await supabase.auth.signInWithPassword({
     email,
+    password,
+  })
+
+  if (error) {
+    throw new Error(getSupabaseErrorMessage(error))
+  }
+}
+
+export const signUpWithEmail = async (email: string, password: string) => {
+  if (!supabase) {
+    throw new Error('Supabase is not configured')
+  }
+
+  const { error: signUpError } = await supabase.auth.signUp({
+    email,
+    password,
     options: {
       emailRedirectTo: getAuthRedirectUrl(),
     },
   })
 
-  if (error) {
-    throw new Error(getSupabaseErrorMessage(error))
+  if (signUpError) {
+    throw new Error(getSupabaseErrorMessage(signUpError))
   }
 }
 

@@ -28,7 +28,7 @@ npm run preview
 
 ## Datos
 
-La app puede sincronizar datos con Supabase usando login por email. Si Supabase no esta configurado, usa IndexedDB local como respaldo.
+La app puede sincronizar datos con Supabase usando email y contrasena. Si Supabase no esta configurado, usa IndexedDB local como respaldo.
 
 ## Supabase
 
@@ -45,20 +45,28 @@ https://alexrodarana.github.io/the-goy-project/**
 http://localhost:5173/**
 ```
 
+4. En Authentication -> Providers -> Email:
+
+```text
+Confirm email: off
+```
+
+Esto evita depender de magic links o SMTP para iniciar sesion.
+
 La URL del proyecto de Supabase debe tener este formato:
 
 ```text
 https://<project-ref>.supabase.co
 ```
 
-4. En GitHub -> repo -> Settings -> Secrets and variables -> Actions -> Secrets agrega:
+5. En GitHub -> repo -> Settings -> Secrets and variables -> Actions -> Secrets agrega:
 
 ```text
 VITE_SUPABASE_URL
 VITE_SUPABASE_ANON_KEY
 ```
 
-5. Corre de nuevo el workflow de GitHub Pages.
+6. Corre de nuevo el workflow de GitHub Pages.
 
 Para desarrollo local, copia `.env.example` a `.env.local` y llena esos valores.
 
