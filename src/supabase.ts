@@ -7,17 +7,41 @@ import type { AppState } from './types'
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
-export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey)
+const isValidUrl = (value: unknown) => {
+  if (typeof value !== 'string' || !value.trim()) {
+    return false
+  }
 
-export const supabase = isSupabaseConfigured
-  ? createClient(supabaseUrl, supabaseAnonKey, {
+  try {
+    const url = new URL(value)
+    return url.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+const canInitializeSupabase = isValidUrl(supabaseUrl) && Boolean(supabaseAnonKey)
+
+export const supabase = (() => {
+  if (!canInitializeSupabase) {
+    return null
+  }
+
+  try {
+    return createClient(supabaseUrl, supabaseAnonKey, {
       auth: {
         autoRefreshToken: true,
         detectSessionInUrl: true,
         persistSession: true,
       },
     })
-  : null
+  } catch (error) {
+    console.error('Supabase client could not be initialized', error)
+    return null
+  }
+})()
+
+export const isSupabaseConfigured = Boolean(supabase)
 
 export type SyncSession = Session
 
