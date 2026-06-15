@@ -1,0 +1,122 @@
+:root {
+  --bar: rgba(37, 99, 235, 0.28);
+  --bg: #f4f1ea;
+  --brand: #2563eb;
+  --brand-ink: #1d4ed8;
+  --brand-line: #b7cafb;
+  --brand-soft: #e6efff;
+  --chart-a: #2563eb;
+  --chart-b: #0f9f6e;
+  --chart-fill: rgba(37, 99, 235, 0.12);
+  --danger: #be4b49;
+  --field: #f8f4ed;
+  --focus: rgba(37, 99, 235, 0.16);
+  --grid: #e4dccc;
+  --header: #eee8dd;
+  --ink: #1d252b;
+  --input: #fffdf9;
+  --line: #ded5c6;
+  --line-strong: #cfc2b2;
+  --muted: #756f66;
+  --ok: #167a54;
+  --ok-line: #98d2b5;
+  --ok-soft: #e3f6eb;
+  --segmented: #e7dfd2;
+  --shadow: 0 18px 46px rgba(44, 37, 27, 0.08);
+  --shadow-soft: 0 8px 18px rgba(44, 37, 27, 0.08);
+  --surface: #fffaf3;
+  --tooltip: #1d252b;
+  --tooltip-ink: #ffffff;
+  --wash-a: rgba(37, 99, 235, 0.12);
+  --wash-b: rgba(15, 159, 110, 0.09);
+
+  color: var(--ink);
+  background: var(--bg);
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 15px;
+  font-synthesis: none;
+  font-weight: 520;
+  letter-spacing: 0;
+  line-height: 1.45;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+:root[data-theme='dark'] {
+  --bar: rgba(92, 142, 224, 0.32);
+  --bg: #101417;
+  --brand: #39b980;
+  --brand-ink: #bdf5d8;
+  --brand-line: rgba(77, 199, 136, 0.38);
+  --brand-soft: rgba(57, 185, 128, 0.13);
+  --chart-a: #39b980;
+  --chart-b: #7aa8ff;
+  --chart-fill: rgba(57, 185, 128, 0.13);
+  --danger: #d65f5d;
+  --field: #171d21;
+  --focus: rgba(57, 185, 128, 0.18);
+  --grid: #293239;
+  --header: #11171a;
+  --ink: #edf2f5;
+  --input: #11171a;
+  --line: #273139;
+  --line-strong: #35414a;
+  --muted: #9ca8b1;
+  --ok: #56d794;
+  --ok-line: rgba(86, 215, 148, 0.38);
+  --ok-soft: rgba(86, 215, 148, 0.12);
+  --segmented: #161d21;
+  --shadow: 0 22px 58px rgba(0, 0, 0, 0.28);
+  --shadow-soft: 0 10px 24px rgba(0, 0, 0, 0.26);
+  --surface: #151b1f;
+  --tooltip: #edf2f5;
+  --tooltip-ink: #101417;
+  --wash-a: rgba(57, 185, 128, 0.11);
+  --wash-b: rgba(122, 168, 255, 0.1);
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100svh;
+  margin: 0;
+}
+
+button,
+input,
+select {
+  letter-spacing: 0;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+::selection {
+  color: #ffffff;
+  background: var(--brand);
+}
+
+#root {
+  min-height: 100svh;
+}
+
+@media (max-width: 620px) {
+  :root {
+    font-size: 14px;
+  }
+}
