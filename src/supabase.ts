@@ -22,7 +22,17 @@ const isValidUrl = (value: unknown) => {
 
 const canInitializeSupabase = isValidUrl(supabaseUrl) && Boolean(supabaseAnonKey)
 
-const getAuthRedirectUrl = () => new URL(import.meta.env.BASE_URL, window.location.origin).toString()
+const getAuthRedirectUrl = () => {
+  const redirectUrl = new URL(window.location.pathname || '/', window.location.origin)
+  redirectUrl.hash = ''
+  redirectUrl.search = ''
+
+  if (!redirectUrl.pathname.endsWith('/')) {
+    redirectUrl.pathname = `${redirectUrl.pathname}/`
+  }
+
+  return redirectUrl.toString()
+}
 
 const getSupabaseErrorMessage = (error: unknown) => {
   if (error instanceof Error && error.message) {

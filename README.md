@@ -34,11 +34,21 @@ La app puede sincronizar datos con Supabase usando login por email. Si Supabase 
 
 1. Crea un proyecto en Supabase.
 2. Abre SQL Editor y ejecuta `supabase/schema.sql`.
-3. En Authentication -> URL Configuration agrega:
+3. En Authentication -> URL Configuration usa:
 
 ```text
-http://localhost:5173/
+Site URL:
 https://alexrodarana.github.io/the-goy-project/
+
+Redirect URLs:
+https://alexrodarana.github.io/the-goy-project/**
+http://localhost:5173/**
+```
+
+La URL del proyecto de Supabase debe tener este formato:
+
+```text
+https://<project-ref>.supabase.co
 ```
 
 4. En GitHub -> repo -> Settings -> Secrets and variables -> Actions -> Secrets agrega:
