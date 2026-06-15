@@ -1,7 +1,7 @@
 import { initialState } from './sampleData'
 import type { ActiveWorkout, AppState, CheckIn, Routine, TrainingExercise, Workout } from './types'
 
-const DB_NAME = 'the-goy-project-db'
+const DB_NAME = 'the-goy-project-db-v2'
 const DB_VERSION = 1
 const STORE_NAME = 'state'
 const STATE_KEY = 'app'
@@ -171,7 +171,7 @@ const normalizeActiveWorkout = (value: unknown): ActiveWorkout | undefined => {
   return workout.exercises.length ? workout : undefined
 }
 
-const normalizeState = (value: unknown): AppState => {
+export const normalizeState = (value: unknown): AppState => {
   if (!isRecord(value)) {
     return initialState
   }
@@ -234,6 +234,8 @@ export const loadState = async (): Promise<AppState> => {
   }
 }
 
+export const loadLocalState = loadState
+
 export const saveState = async (state: AppState) => {
   if (!('indexedDB' in window)) {
     return
@@ -241,6 +243,8 @@ export const saveState = async (state: AppState) => {
 
   await runTransaction<IDBValidKey>('readwrite', (store) => store.put(state, STATE_KEY))
 }
+
+export const saveLocalState = saveState
 
 export const exportState = (state: AppState) => {
   const blob = new Blob([JSON.stringify(state, null, 2)], {

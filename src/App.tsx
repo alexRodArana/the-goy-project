@@ -7,9 +7,12 @@ import {
   Camera,
   Check,
   CheckCircle2,
+  Cloud,
   Dumbbell,
   History,
   LayoutDashboard,
+  LogOut,
+  Mail,
   Moon,
   Play,
   Plus,
@@ -22,7 +25,17 @@ import {
 import type { LucideIcon } from 'lucide-react'
 import './App.css'
 import { initialState } from './sampleData'
-import { loadState, readPhotoAsDataUrl, saveState } from './storage'
+import { loadLocalState, readPhotoAsDataUrl, saveLocalState } from './storage'
+import {
+  getSession,
+  isSupabaseConfigured,
+  loadRemoteState,
+  onAuthChange,
+  saveRemoteState,
+  signInWithEmail,
+  signOut,
+  type SyncSession,
+} from './supabase'
 import type {
   ActiveWorkout,
   AppState,
@@ -103,6 +116,10 @@ const createTrainingExercise = (exercise: RoutineDraftExercise | Routine['exerci
 function App() {
   const [state, setState] = useState<AppState>(initialState)
   const [isLoaded, setIsLoaded] = useState(false)
+  const [session, setSession] = useState<SyncSession | null>(null)
+  const [syncEmail, setSyncEmail] = useState('')
+  const [syncMessage, setSyncMessage] = useState('')
+  const [syncStatus, setSyncStatus] = useState<'local' | 'loading' | 'synced' | 'sent' | 'error'>('local')
   const [activeTab, setActiveTabState] = useState<TabKey>(() => tabFromHash())
   const [theme, setTheme] = useState<ThemeMode>(() => {
     const storedTheme = localStorage.getItem('goy-theme')
@@ -127,29 +144,87 @@ function App() {
     exercises: [createRoutineExercise()],
   })
 
+  const applyLoadedState = (savedState: AppState) => {
+    setState(savedState)
+    setSelectedRoutineId(savedState.routines[0]?.id ?? '')
+    setSelectedHistoryId([...savedState.workouts].sort((a, b) => b.date.localeCompare(a.date))[0]?.id ?? '')
+    setVisibleExercises(new Set(getExerciseNames(savedState.workouts)))
+
+    const latestCheckIn = [...savedState.checkIns].sort((a, b) => b.date.localeCompare(a.date))[0]
+    if (latestCheckIn) {
+      setCheckInDraft((draft) => ({ ...draft, weight: latestCheckIn.weight }))
+    }
+  }
+
   useEffect(() => {
     let mounted = true
 
-    loadState().then((savedState) => {
-      if (!mounted) {
+    const loadInitialState = async () => {
+      try {
+        if (isSupabaseConfigured) {
+          const currentSession = await getSession()
+          if (!mounted) {
+            return
+          }
+
+          setSession(currentSession)
+
+          if (currentSession) {
+            const remoteState = await loadRemoteState(currentSession.user.id)
+            if (!mounted) {
+              return
+            }
+            applyLoadedState(remoteState)
+            setSyncStatus('synced')
+          } else {
+            applyLoadedState(await loadLocalState())
+            setSyncStatus('local')
+          }
+        } else {
+          applyLoadedState(await loadLocalState())
+          setSyncStatus('local')
+        }
+      } catch (error) {
+        console.error('Could not load persisted state', error)
+        if (mounted) {
+          applyLoadedState(await loadLocalState())
+          setSyncStatus('error')
+          setSyncMessage('No se pudo cargar Supabase.')
+        }
+      } finally {
+        if (mounted) {
+          setIsLoaded(true)
+        }
+      }
+    }
+
+    loadInitialState()
+
+    const unsubscribe = onAuthChange(async (nextSession) => {
+      setSession(nextSession)
+      if (!nextSession) {
+        setSyncStatus('local')
         return
       }
 
-      setState(savedState)
-      setSelectedRoutineId(savedState.routines[0]?.id ?? '')
-      setSelectedHistoryId([...savedState.workouts].sort((a, b) => b.date.localeCompare(a.date))[0]?.id ?? '')
-      setVisibleExercises(new Set(getExerciseNames(savedState.workouts)))
-
-      const latestCheckIn = [...savedState.checkIns].sort((a, b) => b.date.localeCompare(a.date))[0]
-      if (latestCheckIn) {
-        setCheckInDraft((draft) => ({ ...draft, weight: latestCheckIn.weight }))
+      try {
+        const remoteState = await loadRemoteState(nextSession.user.id)
+        if (!mounted) {
+          return
+        }
+        applyLoadedState(remoteState)
+        setSyncStatus('synced')
+        setSyncMessage('')
+      } catch (error) {
+        console.error('Could not load remote state', error)
+        setSyncStatus('error')
+        setSyncMessage('No se pudo sincronizar.')
       }
-
-      setIsLoaded(true)
     })
 
     return () => {
       mounted = false
+      unsubscribe()
     }
   }, [])
 
@@ -170,13 +245,27 @@ function App() {
     }
 
     const timeout = window.setTimeout(() => {
-      saveState(state).catch((error) => {
-        console.error('Could not save local state', error)
-      })
+      const persist = async () => {
+        try {
+          await saveLocalState(state)
+          if (session) {
+            await saveRemoteState(session.user.id, state)
+            setSyncStatus('synced')
+          } else {
+            setSyncStatus('local')
+          }
+        } catch (error) {
+          console.error('Could not save state', error)
+          setSyncStatus('error')
+          setSyncMessage('No se pudo guardar.')
+        }
+      }
+
+      persist()
     }, 220)
 
     return () => window.clearTimeout(timeout)
-  }, [isLoaded, state])
+  }, [isLoaded, session, state])
 
   useEffect(() => {
     if (!state.activeWorkout) {
@@ -208,6 +297,30 @@ function App() {
 
   const resetRoutineDraft = () => {
     setRoutineDraft({ name: '', days: '', exercises: [createRoutineExercise()] })
+  }
+
+  const requestSyncLink = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!syncEmail.trim()) {
+      return
+    }
+
+    try {
+      setSyncStatus('loading')
+      await signInWithEmail(syncEmail.trim())
+      setSyncStatus('sent')
+      setSyncMessage('Revisa tu correo.')
+    } catch (error) {
+      console.error('Could not request magic link', error)
+      setSyncStatus('error')
+      setSyncMessage('No se pudo enviar el link.')
+    }
+  }
+
+  const disconnectSync = async () => {
+    await signOut()
+    setSession(null)
+    setSyncStatus('local')
   }
 
   const addCheckIn = (event: FormEvent<HTMLFormElement>) => {
@@ -386,6 +499,17 @@ function App() {
       </header>
 
       <main className="main">
+        <SyncPanel
+          email={syncEmail}
+          isConfigured={isSupabaseConfigured}
+          message={syncMessage}
+          session={session}
+          setEmail={setSyncEmail}
+          signOut={disconnectSync}
+          status={syncStatus}
+          submit={requestSyncLink}
+        />
+
         {activeTab === 'training' && (
           <TrainingView
             activeWorkout={state.activeWorkout}
@@ -683,6 +807,65 @@ function TrainingView({
         </button>
       </div>
     </section>
+  )
+}
+
+function SyncPanel({
+  email,
+  isConfigured,
+  message,
+  session,
+  setEmail,
+  signOut: disconnect,
+  status,
+  submit,
+}: {
+  email: string
+  isConfigured: boolean
+  message: string
+  session: SyncSession | null
+  setEmail: Dispatch<SetStateAction<string>>
+  signOut: () => void
+  status: 'local' | 'loading' | 'synced' | 'sent' | 'error'
+  submit: (event: FormEvent<HTMLFormElement>) => void
+}) {
+  if (!isConfigured) {
+    return (
+      <section className="sync-panel muted">
+        <Cloud size={17} />
+        <span>Supabase pendiente</span>
+      </section>
+    )
+  }
+
+  if (session) {
+    return (
+      <section className="sync-panel connected">
+        <Cloud size={17} />
+        <span>{status === 'synced' ? 'Sincronizado' : 'Guardando'}</span>
+        <strong>{session.user.email}</strong>
+        <button className="icon-button flat" data-tooltip="Salir" type="button" onClick={disconnect}>
+          <LogOut size={16} />
+        </button>
+      </section>
+    )
+  }
+
+  return (
+    <form className="sync-panel login" onSubmit={submit}>
+      <Mail size={17} />
+      <input
+        aria-label="Email"
+        placeholder="email para sincronizar"
+        type="email"
+        value={email}
+        onChange={(event) => setEmail(event.target.value)}
+      />
+      <button className="primary-button compact" disabled={status === 'loading'} type="submit">
+        Sync
+      </button>
+      {message && <small>{message}</small>}
+    </form>
   )
 }
 

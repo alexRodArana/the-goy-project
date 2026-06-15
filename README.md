@@ -28,9 +28,29 @@ npm run preview
 
 ## Datos
 
-La app guarda todo en IndexedDB del navegador. Esto mantiene el MVP gratis y rapido, sin base de datos ni servidor. Usa los botones de importar/exportar backup para mover tus registros entre dispositivos.
+La app puede sincronizar datos con Supabase usando login por email. Si Supabase no esta configurado, usa IndexedDB local como respaldo.
 
-Para sincronizacion entre dispositivos en una siguiente fase, el upgrade natural es Supabase Free para auth, Postgres y storage.
+## Supabase
+
+1. Crea un proyecto en Supabase.
+2. Abre SQL Editor y ejecuta `supabase/schema.sql`.
+3. En Authentication -> URL Configuration agrega:
+
+```text
+http://localhost:5173/
+https://alexrodarana.github.io/the-goy-project/
+```
+
+4. En GitHub -> repo -> Settings -> Secrets and variables -> Actions -> Secrets agrega:
+
+```text
+VITE_SUPABASE_URL
+VITE_SUPABASE_ANON_KEY
+```
+
+5. Corre de nuevo el workflow de GitHub Pages.
+
+Para desarrollo local, copia `.env.example` a `.env.local` y llena esos valores.
 
 ## Deploy gratis
 

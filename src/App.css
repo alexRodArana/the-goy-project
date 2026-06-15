@@ -104,6 +104,53 @@
   padding: 28px 0 44px;
 }
 
+.sync-panel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: fit-content;
+  max-width: 100%;
+  min-height: 44px;
+  margin: 0 auto 18px;
+  padding: 8px 10px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow-soft);
+  backdrop-filter: blur(14px);
+}
+
+.sync-panel.connected {
+  color: var(--brand-ink);
+  border-color: var(--brand-line);
+}
+
+.sync-panel strong {
+  max-width: 220px;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sync-panel.login {
+  display: grid;
+  grid-template-columns: 18px minmax(180px, 260px) auto;
+}
+
+.sync-panel.login small {
+  grid-column: 2 / -1;
+  color: var(--muted);
+}
+
+.sync-panel.login input {
+  height: 36px;
+}
+
 .enter {
   animation: enter 280ms ease both;
 }
@@ -976,6 +1023,14 @@ select:disabled {
   .main {
     width: min(100% - 24px, 1180px);
     padding-top: 18px;
+  }
+
+  .sync-panel {
+    width: 100%;
+  }
+
+  .sync-panel.login {
+    grid-template-columns: 18px minmax(0, 1fr) auto;
   }
 
   .tab {
