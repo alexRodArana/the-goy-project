@@ -120,6 +120,7 @@ function App() {
   const [syncEmail, setSyncEmail] = useState('')
   const [syncMessage, setSyncMessage] = useState('')
   const [syncStatus, setSyncStatus] = useState<'local' | 'loading' | 'synced' | 'sent' | 'error'>('local')
+  const [syncCooldown, setSyncCooldown] = useState(0)
   const [activeTab, setActiveTabState] = useState<TabKey>(() => tabFromHash())
   const [theme, setTheme] = useState<ThemeMode>(() => {
     const storedTheme = localStorage.getItem('goy-theme')
@@ -276,6 +277,15 @@ function App() {
     return () => window.clearInterval(interval)
   }, [state.activeWorkout])
 
+  useEffect(() => {
+    if (syncCooldown <= 0) {
+      return
+    }
+
+    const interval = window.setInterval(() => setSyncCooldown((seconds) => Math.max(0, seconds - 1)), 1000)
+    return () => window.clearInterval(interval)
+  }, [syncCooldown])
+
   const sortedCheckIns = useMemo(
     () => [...state.checkIns].sort((a, b) => a.date.localeCompare(b.date)),
     [state.checkIns],
@@ -302,7 +312,7 @@ function App() {
 
   const requestSyncLink = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (!syncEmail.trim()) {
+    if (!syncEmail.trim() || syncCooldown > 0) {
       return
     }
 
@@ -314,7 +324,15 @@ function App() {
     } catch (error) {
       console.error('Could not request magic link', error)
       setSyncStatus('error')
-      setSyncMessage(error instanceof Error ? error.message : 'No se pudo enviar el link.')
+      const errorMessage = error instanceof Error ? error.message : 'No se pudo enviar el link.'
+
+      if (errorMessage.toLowerCase().includes('rate limit')) {
+        setSyncCooldown(60)
+        setSyncMessage('Espera 60 segundos antes de pedir otro link.')
+        return
+      }
+
+      setSyncMessage(errorMessage)
     }
   }
 
@@ -509,6 +527,7 @@ function App() {
           signOut={disconnectSync}
           status={syncStatus}
           submit={requestSyncLink}
+          syncCooldown={syncCooldown}
         />
 
         {activeTab === 'training' && (
@@ -820,6 +839,7 @@ function SyncPanel({
   signOut: disconnect,
   status,
   submit,
+  syncCooldown,
 }: {
   email: string
   isConfigured: boolean
@@ -829,6 +849,7 @@ function SyncPanel({
   signOut: () => void
   status: 'local' | 'loading' | 'synced' | 'sent' | 'error'
   submit: (event: FormEvent<HTMLFormElement>) => void
+  syncCooldown: number
 }) {
   if (!isConfigured) {
     return (
@@ -862,8 +883,8 @@ function SyncPanel({
         value={email}
         onChange={(event) => setEmail(event.target.value)}
       />
-      <button className="primary-button compact" disabled={status === 'loading'} type="submit">
-        Sync
+      <button className="primary-button compact" disabled={status === 'loading' || syncCooldown > 0} type="submit">
+        {syncCooldown > 0 ? `${syncCooldown}s` : 'Sync'}
       </button>
       {message && <small>{message}</small>}
     </form>
