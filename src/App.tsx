@@ -314,7 +314,7 @@ function App() {
     } catch (error) {
       console.error('Could not request magic link', error)
       setSyncStatus('error')
-      setSyncMessage('No se pudo enviar el link.')
+      setSyncMessage(error instanceof Error ? error.message : 'No se pudo enviar el link.')
     }
   }
 

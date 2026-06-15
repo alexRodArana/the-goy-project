@@ -22,6 +22,16 @@ const isValidUrl = (value: unknown) => {
 
 const canInitializeSupabase = isValidUrl(supabaseUrl) && Boolean(supabaseAnonKey)
 
+const getAuthRedirectUrl = () => new URL(import.meta.env.BASE_URL, window.location.origin).toString()
+
+const getSupabaseErrorMessage = (error: unknown) => {
+  if (error instanceof Error && error.message) {
+    return error.message
+  }
+
+  return 'Error desconocido de Supabase'
+}
+
 export const supabase = (() => {
   if (!canInitializeSupabase) {
     return null
@@ -78,12 +88,12 @@ export const signInWithEmail = async (email: string) => {
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: {
-      emailRedirectTo: window.location.href.split('#')[0],
+      emailRedirectTo: getAuthRedirectUrl(),
     },
   })
 
   if (error) {
-    throw error
+    throw new Error(getSupabaseErrorMessage(error))
   }
 }
 
