@@ -289,6 +289,7 @@ function App() {
   const elapsedSeconds = state.activeWorkout
     ? Math.floor((now - new Date(state.activeWorkout.startedAt).getTime()) / 1000)
     : 0
+  const isTrainingFocus = activeTab === 'training' && Boolean(state.activeWorkout || trainingMode === 'create')
 
   const setActiveTab = (tab: TabKey) => {
     setActiveTabState(tab)
@@ -498,7 +499,7 @@ function App() {
         </button>
       </header>
 
-      <main className="main">
+      <main className={isTrainingFocus ? 'main main-focus' : 'main'}>
         <SyncPanel
           email={syncEmail}
           isConfigured={isSupabaseConfigured}
@@ -879,21 +880,23 @@ function HistoryView({
   workouts: Workout[]
 }) {
   return (
-    <section className="history-layout enter">
-      <div className="history-list surface">
-        {workouts.map((workout) => (
-          <button
-            className={selectedWorkout?.id === workout.id ? 'history-row active' : 'history-row'}
-            key={workout.id}
-            type="button"
-            onClick={() => setSelectedWorkoutId(workout.id)}
-          >
-            <span>{formatDate(workout.date)}</span>
-            <strong>{workout.routineName}</strong>
-            <small>{formatDuration(workout.durationSeconds)}</small>
-          </button>
-        ))}
-      </div>
+    <section className={workouts.length ? 'history-layout enter' : 'history-layout history-empty enter'}>
+      {workouts.length > 0 && (
+        <div className="history-list surface">
+          {workouts.map((workout) => (
+            <button
+              className={selectedWorkout?.id === workout.id ? 'history-row active' : 'history-row'}
+              key={workout.id}
+              type="button"
+              onClick={() => setSelectedWorkoutId(workout.id)}
+            >
+              <span>{formatDate(workout.date)}</span>
+              <strong>{workout.routineName}</strong>
+              <small>{formatDuration(workout.durationSeconds)}</small>
+            </button>
+          ))}
+        </div>
+      )}
 
       <section className="surface history-detail">
         {selectedWorkout ? (
