@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, ChangeEvent, Dispatch, FormEvent, ReactNode, SetStateAction } from 'react'
 import {
   ArrowLeft,
@@ -114,8 +114,12 @@ const createTrainingExercise = (exercise: RoutineDraftExercise | Routine['exerci
   })),
 })
 
+const hasUserData = (value: AppState) =>
+  Boolean(value.checkIns.length || value.routines.length || value.workouts.length || value.activeWorkout)
+
 function App() {
   const [state, setState] = useState<AppState>(initialState)
+  const stateRef = useRef(state)
   const [isLoaded, setIsLoaded] = useState(false)
   const [session, setSession] = useState<SyncSession | null>(null)
   const [syncEmail, setSyncEmail] = useState('')
@@ -147,7 +151,8 @@ function App() {
     exercises: [createRoutineExercise()],
   })
 
-  const applyLoadedState = (savedState: AppState) => {
+  const applyLoadedState = useCallback((savedState: AppState) => {
+    stateRef.current = savedState
     setState(savedState)
     setSelectedRoutineId(savedState.routines[0]?.id ?? '')
     setSelectedHistoryId([...savedState.workouts].sort((a, b) => b.date.localeCompare(a.date))[0]?.id ?? '')
@@ -157,7 +162,19 @@ function App() {
     if (latestCheckIn) {
       setCheckInDraft((draft) => ({ ...draft, weight: latestCheckIn.weight }))
     }
-  }
+  }, [])
+
+  const applyRemoteState = useCallback(async (userId: string, localState: AppState) => {
+    const remoteState = await loadRemoteState(userId)
+    const shouldBootstrapRemote = !hasUserData(remoteState) && hasUserData(localState)
+    const nextState = shouldBootstrapRemote ? localState : remoteState
+
+    applyLoadedState(nextState)
+
+    if (shouldBootstrapRemote) {
+      await saveRemoteState(userId, nextState)
+    }
+  }, [applyLoadedState])
 
   useEffect(() => {
     let mounted = true
@@ -173,11 +190,11 @@ function App() {
           setSession(currentSession)
 
           if (currentSession) {
-            const remoteState = await loadRemoteState(currentSession.user.id)
+            const localState = await loadLocalState()
             if (!mounted) {
               return
             }
-            applyLoadedState(remoteState)
+            await applyRemoteState(currentSession.user.id, localState)
             setSyncStatus('synced')
           } else {
             applyLoadedState(await loadLocalState())
@@ -211,13 +228,14 @@ function App() {
       }
 
       try {
-        const remoteState = await loadRemoteState(nextSession.user.id)
+        const localState = stateRef.current
         if (!mounted) {
           return
         }
-        applyLoadedState(remoteState)
+        await applyRemoteState(nextSession.user.id, localState)
         setSyncStatus('synced')
         setSyncMessage('')
+        setSyncPassword('')
       } catch (error) {
         console.error('Could not load remote state', error)
         setSyncStatus('error')
@@ -229,7 +247,11 @@ function App() {
       mounted = false
       unsubscribe()
     }
-  }, [])
+  }, [applyLoadedState, applyRemoteState])
+
+  useEffect(() => {
+    stateRef.current = state
+  }, [state])
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
@@ -331,13 +353,13 @@ function App() {
       setSyncStatus('sent')
       setSyncMessage(intent === 'signup' ? 'Cuenta creada.' : '')
     } catch (error) {
-      console.error('Could not request magic link', error)
+      console.error('Could not authenticate with Supabase', error)
       setSyncStatus('error')
-      const errorMessage = error instanceof Error ? error.message : 'No se pudo enviar el link.'
+      const errorMessage = error instanceof Error ? error.message : 'No se pudo sincronizar.'
 
       if (errorMessage.toLowerCase().includes('rate limit')) {
         setSyncCooldown(60)
-        setSyncMessage('Espera 60 segundos antes de pedir otro link.')
+        setSyncMessage('Espera 60 segundos antes de intentar otra vez.')
         return
       }
 
@@ -359,6 +381,7 @@ function App() {
     await signOut()
     setSession(null)
     setSyncStatus('local')
+    setSyncPassword('')
   }
 
   const addCheckIn = (event: FormEvent<HTMLFormElement>) => {
@@ -501,7 +524,7 @@ function App() {
   return (
     <div className="app-shell">
       <header className="app-header">
-        <button className="brand" type="button" onClick={() => setActiveTab('training')}>
+        <button className="brand" aria-label="Ir a Training" type="button" onClick={() => setActiveTab('training')}>
           <span className="brand-mark">
             <Dumbbell size={19} />
           </span>
@@ -527,6 +550,7 @@ function App() {
         </nav>
 
         <button
+          aria-label={theme === 'dark' ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'}
           className="icon-button"
           data-tooltip={theme === 'dark' ? 'Tema claro' : 'Tema oscuro'}
           type="button"
@@ -669,6 +693,7 @@ function TrainingView({
                 {exercise.sets.map((set) => (
                   <div className={set.completed ? 'set-line complete' : 'set-line'} key={set.id}>
                     <button
+                      aria-label={set.completed ? 'Marcar serie pendiente' : 'Completar serie'}
                       className="complete-toggle"
                       data-tooltip="Completar"
                       type="button"
@@ -726,6 +751,7 @@ function TrainingView({
         <form className="surface routine-form focused" onSubmit={saveRoutine}>
           <div className="focus-top">
             <button
+              aria-label="Volver"
               className="icon-button flat"
               data-tooltip="Volver"
               type="button"
@@ -781,14 +807,16 @@ function TrainingView({
                     setRoutineDraft((draft) => ({
                       ...draft,
                       exercises: draft.exercises.map((row) =>
-                        row.id === exercise.id ? { ...row, sets: Number(event.target.value) } : row,
+                        row.id === exercise.id ? { ...row, sets: Math.max(1, Number(event.target.value) || 1) } : row,
                       ),
                     }))
                   }
                 />
                 <button
+                  aria-label="Eliminar ejercicio"
                   className="icon-button flat"
                   data-tooltip="Eliminar"
+                  disabled={routineDraft.exercises.length === 1}
                   type="button"
                   onClick={() =>
                     setRoutineDraft((draft) => ({
@@ -805,7 +833,9 @@ function TrainingView({
 
           <div className="button-row">
             <button
+              aria-label="Agregar ejercicio"
               className="secondary-button"
+              data-tooltip="Agregar ejercicio"
               type="button"
               onClick={() =>
                 setRoutineDraft((draft) => ({
@@ -829,23 +859,38 @@ function TrainingView({
   return (
     <section className="training-home enter">
       <div className="surface start-card">
-        <div className="routine-picker">
-          <select value={selectedRoutineId} onChange={(event) => setSelectedRoutineId(event.target.value)}>
-            {routines.map((routine) => (
-              <option key={routine.id} value={routine.id}>
-                {routine.name}
-              </option>
-            ))}
-          </select>
-          <button className="icon-button" data-tooltip="Nueva rutina" type="button" onClick={() => setMode('create')}>
-            <Plus size={19} />
-          </button>
-        </div>
+        {routines.length ? (
+          <>
+            <div className="routine-picker">
+              <select value={selectedRoutineId} onChange={(event) => setSelectedRoutineId(event.target.value)}>
+                {routines.map((routine) => (
+                  <option key={routine.id} value={routine.id}>
+                    {routine.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                aria-label="Nueva rutina"
+                className="icon-button"
+                data-tooltip="Nueva rutina"
+                type="button"
+                onClick={() => setMode('create')}
+              >
+                <Plus size={19} />
+              </button>
+            </div>
 
-        <button className="primary-button start-button" disabled={!selectedRoutine} type="button" onClick={startWorkout}>
-          <Play size={20} />
-          Iniciar
-        </button>
+            <button className="primary-button start-button" disabled={!selectedRoutine} type="button" onClick={startWorkout}>
+              <Play size={20} />
+              Iniciar
+            </button>
+          </>
+        ) : (
+          <button className="first-routine-button" type="button" onClick={() => setMode('create')}>
+            <Plus size={20} />
+            Crear rutina
+          </button>
+        )}
       </div>
     </section>
   )
@@ -891,7 +936,7 @@ function SyncPanel({
         <Cloud size={17} />
         <span>{status === 'synced' ? 'Sincronizado' : 'Guardando'}</span>
         <strong>{session.user.email}</strong>
-        <button className="icon-button flat" data-tooltip="Salir" type="button" onClick={disconnect}>
+        <button aria-label="Salir" className="icon-button flat" data-tooltip="Salir" type="button" onClick={disconnect}>
           <LogOut size={16} />
         </button>
       </section>
@@ -903,6 +948,7 @@ function SyncPanel({
       <Mail size={17} />
       <input
         aria-label="Email"
+        autoComplete="email"
         placeholder="email"
         type="email"
         value={email}
@@ -910,6 +956,7 @@ function SyncPanel({
       />
       <input
         aria-label="Contraseña"
+        autoComplete="current-password"
         minLength={6}
         placeholder="contraseña"
         type="password"
@@ -1043,7 +1090,7 @@ function TimelineView({
                 />
               </Field>
               <div className="button-row">
-                <button className="secondary-button" type="button" onClick={() => setIsAdding(false)}>
+                <button aria-label="Cancelar" className="secondary-button" type="button" onClick={() => setIsAdding(false)}>
                   <ArrowLeft size={17} />
                 </button>
                 <button className="primary-button compact" type="submit">
@@ -1053,7 +1100,7 @@ function TimelineView({
               </div>
             </form>
           ) : (
-            <button className="add-photo-button" type="button" onClick={() => setIsAdding(true)}>
+            <button aria-label="Agregar foto y peso" className="add-photo-button" type="button" onClick={() => setIsAdding(true)}>
               <Plus size={26} />
             </button>
           )}
@@ -1078,10 +1125,11 @@ function DashboardView({
   const monthKey = todayIso().slice(0, 7)
   const monthCheckIns = checkIns.filter((checkIn) => checkIn.date.startsWith(monthKey))
   const sortedMonthCheckIns = [...monthCheckIns].sort((a, b) => a.date.localeCompare(b.date))
-  const currentWeight = checkIns.at(-1)?.weight ?? 0
+  const currentWeight = checkIns.at(-1)?.weight
   const initialMonthWeight = sortedMonthCheckIns[0]?.weight ?? currentWeight
   const monthWorkouts = workouts.filter((workout) => workout.date.startsWith(monthKey))
-  const exerciseNames = getExerciseNames(workouts)
+  const exerciseNames = useMemo(() => getExerciseNames(workouts), [workouts])
+  const metricWeight = (value?: number) => (value ? `${formatNumber(value)} kg` : '--')
 
   useEffect(() => {
     if (!visibleExercises.size && exerciseNames.length) {
@@ -1104,8 +1152,8 @@ function DashboardView({
   return (
     <section className="page-stack enter">
       <div className="metric-grid">
-        <MetricCard icon={CalendarDays} label="Inicio mes" value={`${formatNumber(initialMonthWeight)} kg`} />
-        <MetricCard icon={Scale} label="Actual" value={`${formatNumber(currentWeight)} kg`} />
+        <MetricCard icon={CalendarDays} label="Inicio mes" value={metricWeight(initialMonthWeight)} />
+        <MetricCard icon={Scale} label="Actual" value={metricWeight(currentWeight)} />
         <MetricCard icon={Dumbbell} label="Entrenos mes" value={String(monthWorkouts.length)} />
       </div>
 

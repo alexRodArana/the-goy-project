@@ -182,30 +182,6 @@
   gap: 10px;
 }
 
-.routine-preview {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  min-height: 76px;
-  padding: 14px;
-  background: var(--field);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-}
-
-.routine-preview strong,
-.routine-preview span {
-  display: block;
-}
-
-.routine-preview strong {
-  color: var(--ink);
-  font-size: 19px;
-}
-
-.routine-preview span,
-.routine-card span,
 .history-row span,
 .history-row small,
 .detail-head span {
@@ -214,61 +190,34 @@
   font-weight: 760;
 }
 
-.routine-preview small,
-.routine-card small {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 32px;
-  height: 32px;
-  color: var(--brand-ink);
-  font-weight: 900;
-  background: var(--brand-soft);
-  border: 1px solid var(--brand-line);
-  border-radius: 8px;
-}
-
 .start-button {
   min-height: 54px;
   font-size: 17px;
 }
 
-.routine-strip {
-  display: flex;
-  gap: 10px;
-  margin-top: 16px;
-  overflow-x: auto;
-  padding-bottom: 4px;
-}
-
-.routine-pill {
-  display: flex;
+.first-routine-button {
+  display: inline-flex;
   align-items: center;
-  gap: 4px;
-  min-width: 190px;
-  padding: 8px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  box-shadow: var(--shadow-soft);
-}
-
-.routine-pill.active {
-  border-color: var(--brand-line);
-}
-
-.routine-pill > button:first-child {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  flex: 1;
-  min-height: 38px;
-  color: var(--ink);
+  justify-content: center;
+  gap: 9px;
+  min-height: 58px;
+  width: 100%;
+  color: var(--brand-ink);
   font: inherit;
-  background: transparent;
-  border: 0;
+  font-size: 16px;
+  font-weight: 900;
+  background: var(--brand-soft);
+  border: 1px dashed var(--brand-line);
+  border-radius: 8px;
   cursor: pointer;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    transform 160ms ease;
+}
+
+.first-routine-button:hover {
+  transform: translateY(-1px);
 }
 
 .routine-create {
@@ -1235,6 +1184,11 @@ select:disabled {
   .start-button {
     min-height: 50px;
     font-size: 16px;
+  }
+
+  .first-routine-button {
+    min-height: 52px;
+    border-radius: 10px;
   }
 
   .routine-form {

@@ -283,7 +283,7 @@ export const readPhotoAsDataUrl = (file: File) =>
       const image = new Image()
 
       image.onload = () => {
-        const maxSize = 1400
+        const maxSize = 1200
         const scale = Math.min(1, maxSize / Math.max(image.width, image.height))
         const canvas = document.createElement('canvas')
         canvas.width = Math.round(image.width * scale)
@@ -296,7 +296,7 @@ export const readPhotoAsDataUrl = (file: File) =>
         }
 
         context.drawImage(image, 0, 0, canvas.width, canvas.height)
-        resolve(canvas.toDataURL('image/jpeg', 0.84))
+        resolve(canvas.toDataURL('image/jpeg', 0.8))
       }
 
       image.onerror = () => resolve(original)

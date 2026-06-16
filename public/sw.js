@@ -1,4 +1,4 @@
-const CACHE_NAME = 'the-goy-project-v1'
+const CACHE_NAME = 'the-goy-project-v2'
 const SCOPE = self.registration.scope
 const APP_SHELL = [SCOPE, `${SCOPE}manifest.webmanifest`, `${SCOPE}favicon.svg`]
 
@@ -18,6 +18,11 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') {
+    return
+  }
+
+  const requestUrl = new URL(event.request.url)
+  if (requestUrl.origin !== self.location.origin) {
     return
   }
 
