@@ -527,6 +527,7 @@
 
 .history-card {
   overflow: hidden;
+  touch-action: pan-y;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -538,8 +539,27 @@
     transform 180ms ease;
 }
 
+.history-card.dragging,
+.timeline-swipe-card.dragging {
+  transition: none;
+}
+
 .history-card:hover {
   transform: translateY(-1px);
+}
+
+.history-card[data-swipe='edit'] {
+  border-color: var(--brand-line);
+  box-shadow:
+    inset 4px 0 0 var(--brand),
+    var(--shadow);
+}
+
+.history-card[data-swipe='delete'] {
+  border-color: color-mix(in srgb, var(--danger) 48%, var(--line));
+  box-shadow:
+    inset -4px 0 0 var(--danger),
+    var(--shadow);
 }
 
 .history-card.selected {
@@ -811,6 +831,7 @@
   width: 232px;
   aspect-ratio: 3 / 4;
   overflow: hidden;
+  touch-action: pan-x;
   color: var(--muted);
   background: var(--surface);
   border: 1px solid var(--line);
@@ -829,6 +850,20 @@
   z-index: 2;
   display: flex;
   gap: 6px;
+}
+
+.timeline-swipe-card[data-swipe='edit'] {
+  border-color: var(--brand-line);
+  box-shadow:
+    inset 0 4px 0 var(--brand),
+    var(--shadow);
+}
+
+.timeline-swipe-card[data-swipe='delete'] {
+  border-color: color-mix(in srgb, var(--danger) 48%, var(--line));
+  box-shadow:
+    inset 0 -4px 0 var(--danger),
+    var(--shadow);
 }
 
 .vertical-photo-card:hover {

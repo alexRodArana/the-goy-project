@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { CSSProperties, ChangeEvent, Dispatch, FormEvent, ReactNode, SetStateAction } from 'react'
+import type {
+  CSSProperties,
+  ChangeEvent,
+  Dispatch,
+  FormEvent,
+  MouseEvent as ReactMouseEvent,
+  PointerEvent as ReactPointerEvent,
+  ReactNode,
+  SetStateAction,
+} from 'react'
 import {
   Activity,
   ArrowLeft,
@@ -140,14 +149,14 @@ const navItems: { key: TabKey; label: string; icon: LucideIcon }[] = [
 const exerciseColors = ['#2563eb', '#0f9f6e', '#d97706', '#7c3aed', '#dc2626', '#0891b2', '#be185d', '#4f46e5']
 const brandMarkSrc = `${import.meta.env.BASE_URL}app-icon-192.png`
 const trainingPhrases = [
-  'Listo para dejar de ser un Goy?',
-  'Deja de ser el top Goy.',
-  'Toca reventar vena con una rutina Kosher.',
-  'Modo Kosher: peso arriba, excusas abajo.',
-  'Menos Goy, mas reps.',
-  'Hoy no se negocia: se entrena.',
-  'Que la rutina hable por ti.',
-  'La vena no se revienta sola.',
+  'Goy mode off, disciplina Judia on.',
+  'Del Goy al modo Kosher, una serie a la vez.',
+  'Hoy el Goy entrena con enfoque Judio.',
+  'Rutina Kosher para domar al Goy interior.',
+  'Goy Project: reps limpias, mente Kosher.',
+  'El Goy no negocia, el modo Judio ejecuta.',
+  'Que el Goy sude y el modo Kosher mande.',
+  'Goy de entrada, Kosher de salida.',
 ]
 
 const tabFromHash = (): TabKey => {
@@ -254,6 +263,124 @@ const hasUserData = (value: AppState) =>
 const vibrate = (pattern: number | number[] = 10) => {
   if ('vibrate' in navigator) {
     navigator.vibrate(pattern)
+  }
+}
+
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
+
+function useSwipeAction({
+  axis,
+  onDelete,
+  onEdit,
+  threshold = 72,
+}: {
+  axis: 'x' | 'y'
+  onDelete: () => void
+  onEdit: () => void
+  threshold?: number
+}) {
+  const startRef = useRef({ x: 0, y: 0, active: false, locked: false })
+  const offsetRef = useRef(0)
+  const suppressClickRef = useRef(false)
+  const [offset, setOffset] = useState(0)
+
+  const reset = () => {
+    offsetRef.current = 0
+    setOffset(0)
+  }
+
+  const onPointerDown = (event: ReactPointerEvent<HTMLElement>) => {
+    if (event.button !== 0) {
+      return
+    }
+
+    startRef.current = { x: event.clientX, y: event.clientY, active: true, locked: false }
+    offsetRef.current = 0
+    event.currentTarget.setPointerCapture(event.pointerId)
+  }
+
+  const onPointerMove = (event: ReactPointerEvent<HTMLElement>) => {
+    const start = startRef.current
+    if (!start.active) {
+      return
+    }
+
+    const deltaX = event.clientX - start.x
+    const deltaY = event.clientY - start.y
+    const primary = axis === 'x' ? deltaX : deltaY
+    const secondary = axis === 'x' ? deltaY : deltaX
+
+    if (!start.locked && Math.abs(primary) < 10) {
+      return
+    }
+
+    if (Math.abs(primary) <= Math.abs(secondary) * 1.15) {
+      return
+    }
+
+    start.locked = true
+    event.preventDefault()
+    const nextOffset = clamp(primary, -96, 96)
+    offsetRef.current = nextOffset
+    setOffset(nextOffset)
+  }
+
+  const completeGesture = () => {
+    const currentOffset = offsetRef.current
+    const shouldDelete = currentOffset <= -threshold
+    const shouldEdit = currentOffset >= threshold
+    startRef.current = { ...startRef.current, active: false, locked: false }
+
+    if (shouldDelete || shouldEdit) {
+      suppressClickRef.current = true
+      vibrate(18)
+      if (shouldDelete) {
+        onDelete()
+      } else {
+        onEdit()
+      }
+    }
+
+    reset()
+  }
+
+  const onPointerUp = (event: ReactPointerEvent<HTMLElement>) => {
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+    completeGesture()
+  }
+
+  const onPointerCancel = () => {
+    startRef.current = { ...startRef.current, active: false, locked: false }
+    reset()
+  }
+
+  const onClickCapture = (event: ReactMouseEvent<HTMLElement>) => {
+    if (!suppressClickRef.current) {
+      return
+    }
+
+    event.preventDefault()
+    event.stopPropagation()
+    suppressClickRef.current = false
+  }
+
+  return {
+    className: offset ? 'dragging' : '',
+    intent: Math.abs(offset) > 22 ? (offset < 0 ? 'delete' : 'edit') : undefined,
+    style: offset
+      ? ({
+          transform: axis === 'x' ? `translate3d(${offset}px, 0, 0)` : `translate3d(0, ${offset}px, 0)`,
+        } as CSSProperties)
+      : undefined,
+    handlers: {
+      onClickCapture,
+      onPointerCancel,
+      onPointerDown,
+      onPointerMove,
+      onPointerUp,
+    },
   }
 }
 
@@ -1398,39 +1525,16 @@ function HistoryView({
                 const isSelected = selectedWorkout?.id === workout.id
 
                 return (
-                  <article className={isSelected ? 'history-card selected' : 'history-card'} key={workout.id}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        vibrate(8)
-                        setEditingWorkoutId('')
-                        setSelectedWorkoutId((current) => (current === workout.id ? '' : workout.id))
-                      }}
-                    >
-                      <span>{formatShortDate(workout.date)}</span>
-                      <strong>{workout.routineName}</strong>
-                      <small>{formatDuration(workout.durationSeconds)}</small>
-                    </button>
-
-                    {isSelected &&
-                      (editingWorkoutId === workout.id ? (
-                        <WorkoutEditor
-                          key={workout.id}
-                          onCancel={() => setEditingWorkoutId('')}
-                          onSave={updateWorkout}
-                          workout={workout}
-                        />
-                      ) : (
-                        <WorkoutDetail
-                          onDelete={() => deleteWorkout(workout.id)}
-                          onEdit={() => {
-                            vibrate(10)
-                            setEditingWorkoutId(workout.id)
-                          }}
-                          workout={workout}
-                        />
-                      ))}
-                  </article>
+                  <HistoryWorkoutCard
+                    deleteWorkout={deleteWorkout}
+                    editingWorkoutId={editingWorkoutId}
+                    isSelected={isSelected}
+                    key={workout.id}
+                    setEditingWorkoutId={setEditingWorkoutId}
+                    setSelectedWorkoutId={setSelectedWorkoutId}
+                    updateWorkout={updateWorkout}
+                    workout={workout}
+                  />
                 )
               })}
             </div>
@@ -1442,6 +1546,69 @@ function HistoryView({
         </section>
       )}
     </section>
+  )
+}
+
+function HistoryWorkoutCard({
+  deleteWorkout,
+  editingWorkoutId,
+  isSelected,
+  setEditingWorkoutId,
+  setSelectedWorkoutId,
+  updateWorkout,
+  workout,
+}: {
+  deleteWorkout: (id: string) => void
+  editingWorkoutId: string
+  isSelected: boolean
+  setEditingWorkoutId: Dispatch<SetStateAction<string>>
+  setSelectedWorkoutId: Dispatch<SetStateAction<string>>
+  updateWorkout: (workout: Workout) => void
+  workout: Workout
+}) {
+  const swipe = useSwipeAction({
+    axis: 'x',
+    onDelete: () => deleteWorkout(workout.id),
+    onEdit: () => {
+      setSelectedWorkoutId(workout.id)
+      setEditingWorkoutId(workout.id)
+    },
+  })
+
+  return (
+    <article
+      className={[isSelected ? 'history-card selected' : 'history-card', swipe.className].filter(Boolean).join(' ')}
+      data-swipe={swipe.intent}
+      style={swipe.style}
+      {...swipe.handlers}
+    >
+      <button
+        type="button"
+        onClick={() => {
+          vibrate(8)
+          setEditingWorkoutId('')
+          setSelectedWorkoutId((current) => (current === workout.id ? '' : workout.id))
+        }}
+      >
+        <span>{formatShortDate(workout.date)}</span>
+        <strong>{workout.routineName}</strong>
+        <small>{formatDuration(workout.durationSeconds)}</small>
+      </button>
+
+      {isSelected &&
+        (editingWorkoutId === workout.id ? (
+          <WorkoutEditor key={workout.id} onCancel={() => setEditingWorkoutId('')} onSave={updateWorkout} workout={workout} />
+        ) : (
+          <WorkoutDetail
+            onDelete={() => deleteWorkout(workout.id)}
+            onEdit={() => {
+              vibrate(10)
+              setEditingWorkoutId(workout.id)
+            }}
+            workout={workout}
+          />
+        ))}
+    </article>
   )
 }
 
@@ -1799,53 +1966,15 @@ function TimelineView({
     <section className="timeline-horizontal enter">
       <div className="timeline-track">
         {checkIns.map((checkIn) => (
-          <article className="timeline-item" key={checkIn.id}>
-            <div className="timeline-dot" />
-            {editingCheckInId === checkIn.id ? (
-              <CheckInEditor
-                key={checkIn.id}
-                checkIn={checkIn}
-                onCancel={() => setEditingCheckInId('')}
-                onSave={updateCheckIn}
-              />
-            ) : (
-              <>
-                <div className="vertical-photo-card">
-                  <div className="timeline-actions">
-                    <button
-                      aria-label="Editar entrada"
-                      className="icon-button glass"
-                      data-tooltip="Editar"
-                      type="button"
-                      onClick={() => {
-                        vibrate(10)
-                        setIsAdding(false)
-                        setEditingCheckInId(checkIn.id)
-                      }}
-                    >
-                      <Pencil size={15} />
-                    </button>
-                    <button
-                      aria-label="Eliminar entrada"
-                      className="icon-button glass danger-text"
-                      data-tooltip="Eliminar"
-                      type="button"
-                      onClick={() => deleteCheckIn(checkIn.id)}
-                    >
-                      <Trash2 size={15} />
-                    </button>
-                  </div>
-                  {checkIn.photo ? (
-                    <img alt={`Foto ${formatDate(checkIn.date)}`} src={checkIn.photo} />
-                  ) : (
-                    <Camera size={32} />
-                  )}
-                  <strong>{formatNumber(checkIn.weight)} kg</strong>
-                </div>
-                <time>{formatShortDate(checkIn.date)}</time>
-              </>
-            )}
-          </article>
+          <TimelineCheckInItem
+            checkIn={checkIn}
+            deleteCheckIn={deleteCheckIn}
+            editingCheckInId={editingCheckInId}
+            key={checkIn.id}
+            setEditingCheckInId={setEditingCheckInId}
+            setIsAdding={setIsAdding}
+            updateCheckIn={updateCheckIn}
+          />
         ))}
 
         <article className="timeline-item add-item">
@@ -1903,6 +2032,76 @@ function TimelineView({
         </article>
       </div>
     </section>
+  )
+}
+
+function TimelineCheckInItem({
+  checkIn,
+  deleteCheckIn,
+  editingCheckInId,
+  setEditingCheckInId,
+  setIsAdding,
+  updateCheckIn,
+}: {
+  checkIn: CheckIn
+  deleteCheckIn: (id: string) => void
+  editingCheckInId: string
+  setEditingCheckInId: Dispatch<SetStateAction<string>>
+  setIsAdding: Dispatch<SetStateAction<boolean>>
+  updateCheckIn: (entry: CheckIn) => void
+}) {
+  const isEditing = editingCheckInId === checkIn.id
+  const openEditor = () => {
+    vibrate(10)
+    setIsAdding(false)
+    setEditingCheckInId(checkIn.id)
+  }
+  const swipe = useSwipeAction({
+    axis: 'y',
+    onDelete: () => deleteCheckIn(checkIn.id),
+    onEdit: openEditor,
+  })
+
+  return (
+    <article className="timeline-item">
+      <div className="timeline-dot" />
+      {isEditing ? (
+        <CheckInEditor key={checkIn.id} checkIn={checkIn} onCancel={() => setEditingCheckInId('')} onSave={updateCheckIn} />
+      ) : (
+        <>
+          <div
+            className={['vertical-photo-card timeline-swipe-card', swipe.className].filter(Boolean).join(' ')}
+            data-swipe={swipe.intent}
+            style={swipe.style}
+            {...swipe.handlers}
+          >
+            <div className="timeline-actions">
+              <button
+                aria-label="Editar entrada"
+                className="icon-button glass"
+                data-tooltip="Editar"
+                type="button"
+                onClick={openEditor}
+              >
+                <Pencil size={15} />
+              </button>
+              <button
+                aria-label="Eliminar entrada"
+                className="icon-button glass danger-text"
+                data-tooltip="Eliminar"
+                type="button"
+                onClick={() => deleteCheckIn(checkIn.id)}
+              >
+                <Trash2 size={15} />
+              </button>
+            </div>
+            {checkIn.photo ? <img alt={`Foto ${formatDate(checkIn.date)}`} src={checkIn.photo} /> : <Camera size={32} />}
+            <strong>{formatNumber(checkIn.weight)} kg</strong>
+          </div>
+          <time>{formatShortDate(checkIn.date)}</time>
+        </>
+      )}
+    </article>
   )
 }
 
