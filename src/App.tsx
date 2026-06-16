@@ -13,7 +13,6 @@ import {
   Gauge,
   History,
   LayoutDashboard,
-  LogOut,
   Mail,
   Moon,
   Play,
@@ -69,6 +68,12 @@ const formatShortDate = (value: string) =>
   new Intl.DateTimeFormat('es-MX', {
     day: 'numeric',
     month: 'short',
+  }).format(toLocalDate(value))
+
+const formatMonth = (value: string) =>
+  new Intl.DateTimeFormat('es-MX', {
+    month: 'long',
+    year: 'numeric',
   }).format(toLocalDate(value))
 
 const formatNumber = (value: number) =>
@@ -127,6 +132,8 @@ const emptyCardio = (): CardioSession => ({
 
 const hasCardioEntry = (cardio?: CardioSession) =>
   Boolean(cardio && (cardio.completed || cardio.incline !== null || cardio.speed !== null || cardio.durationMinutes !== null))
+
+const getCardioMinutes = (workout: Workout) => workout.cardio.durationMinutes ?? 0
 
 const formatCardioNumber = (value: number | null | undefined, suffix: string) =>
   value === null || value === undefined ? '--' : `${formatNumber(value)} ${suffix}`
@@ -569,34 +576,47 @@ function App() {
           <span>The Goy Project</span>
         </button>
 
-        <nav className="tabs" aria-label="Secciones">
-          {navItems.map((item) => {
-            const Icon = item.icon
-            return (
-              <button
-                aria-current={item.key === activeTab ? 'page' : undefined}
-                className={item.key === activeTab ? 'tab active' : 'tab'}
-                key={item.key}
-                type="button"
-                onClick={() => setActiveTab(item.key)}
-              >
-                <Icon size={17} />
-                <span>{item.label}</span>
-              </button>
-            )
-          })}
-        </nav>
-
-        <button
-          aria-label={theme === 'dark' ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'}
-          className="icon-button"
-          data-tooltip={theme === 'dark' ? 'Tema claro' : 'Tema oscuro'}
-          type="button"
-          onClick={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))}
-        >
-          {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-        </button>
+        <div className="header-actions">
+          {session && (
+            <button
+              aria-label="Cuenta registrada. Tocar para salir"
+              className={syncStatus === 'error' ? 'account-status error' : 'account-status'}
+              data-tooltip={syncStatus === 'error' ? 'Error de sync' : 'Registrado'}
+              type="button"
+              onClick={disconnectSync}
+            >
+              {syncStatus === 'error' ? <Cloud size={17} /> : <CheckCircle2 size={17} />}
+            </button>
+          )}
+          <button
+            aria-label={theme === 'dark' ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'}
+            className="icon-button"
+            data-tooltip={theme === 'dark' ? 'Tema claro' : 'Tema oscuro'}
+            type="button"
+            onClick={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))}
+          >
+            {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
+        </div>
       </header>
+
+      <nav className="tabs" aria-label="Secciones">
+        {navItems.map((item) => {
+          const Icon = item.icon
+          return (
+            <button
+              aria-current={item.key === activeTab ? 'page' : undefined}
+              className={item.key === activeTab ? 'tab active' : 'tab'}
+              key={item.key}
+              type="button"
+              onClick={() => setActiveTab(item.key)}
+            >
+              <Icon size={17} />
+              <span>{item.label}</span>
+            </button>
+          )
+        })}
+      </nav>
 
       <main className={isTrainingFocus ? 'main main-focus' : 'main'}>
         <SyncPanel
@@ -607,7 +627,6 @@ function App() {
           session={session}
           setEmail={setSyncEmail}
           setPassword={setSyncPassword}
-          signOut={disconnectSync}
           status={syncStatus}
           submit={requestSyncLink}
           syncCooldown={syncCooldown}
@@ -1015,7 +1034,6 @@ function SyncPanel({
   session,
   setEmail,
   setPassword,
-  signOut: disconnect,
   status,
   submit,
   syncCooldown,
@@ -1027,7 +1045,6 @@ function SyncPanel({
   session: SyncSession | null
   setEmail: Dispatch<SetStateAction<string>>
   setPassword: Dispatch<SetStateAction<string>>
-  signOut: () => void
   status: 'local' | 'loading' | 'synced' | 'sent' | 'error'
   submit: (event: FormEvent<HTMLFormElement>) => void
   syncCooldown: number
@@ -1042,16 +1059,7 @@ function SyncPanel({
   }
 
   if (session) {
-    return (
-      <section className="sync-panel connected">
-        <Cloud size={17} />
-        <span>{status === 'synced' ? 'Sincronizado' : 'Guardando'}</span>
-        <strong>{session.user.email}</strong>
-        <button aria-label="Salir" className="icon-button flat" data-tooltip="Salir" type="button" onClick={disconnect}>
-          <LogOut size={16} />
-        </button>
-      </section>
-    )
+    return null
   }
 
   return (
@@ -1094,68 +1102,101 @@ function HistoryView({
   setSelectedWorkoutId: Dispatch<SetStateAction<string>>
   workouts: Workout[]
 }) {
+  const totalSeconds = workouts.reduce((total, workout) => total + workout.durationSeconds, 0)
+  const cardioMinutes = workouts.reduce((total, workout) => total + getCardioMinutes(workout), 0)
+  const groupedWorkouts = groupWorkoutsByMonth(workouts)
+
   return (
-    <section className={workouts.length ? 'history-layout enter' : 'history-layout history-empty enter'}>
-      {workouts.length > 0 && (
-        <div className="history-list surface">
-          {workouts.map((workout) => (
-            <button
-              className={selectedWorkout?.id === workout.id ? 'history-row active' : 'history-row'}
-              key={workout.id}
-              type="button"
-              onClick={() => setSelectedWorkoutId(workout.id)}
-            >
-              <span>{formatDate(workout.date)}</span>
-              <strong>{workout.routineName}</strong>
-              <small>{formatDuration(workout.durationSeconds)}</small>
-            </button>
-          ))}
-        </div>
-      )}
+    <section className={workouts.length ? 'history-feed enter' : 'history-feed history-empty enter'}>
+      {workouts.length ? (
+        <>
+          <div className="history-summary">
+            <SummaryPill label="Entrenos" value={String(workouts.length)} />
+            <SummaryPill label="Tiempo" value={formatDuration(totalSeconds)} />
+            <SummaryPill label="Cardio" value={`${formatNumber(cardioMinutes)} min`} />
+          </div>
 
-      <section className="surface history-detail">
-        {selectedWorkout ? (
-          <>
-            <div className="detail-head">
-              <div>
-                <span>{formatDate(selectedWorkout.date)}</span>
-                <h2>{selectedWorkout.routineName}</h2>
+          {groupedWorkouts.map(({ month, items }) => (
+            <section className="history-month" key={month}>
+              <h2>{month}</h2>
+              <div className="history-cards">
+                {items.map((workout) => {
+                  const isSelected = selectedWorkout?.id === workout.id
+                  const completedSets = workout.exercises.reduce(
+                    (total, exercise) => total + exercise.sets.filter((set) => set.completed).length,
+                    0,
+                  )
+
+                  return (
+                    <article className={isSelected ? 'history-card selected' : 'history-card'} key={workout.id}>
+                      <button type="button" onClick={() => setSelectedWorkoutId(workout.id)}>
+                        <span>{formatShortDate(workout.date)}</span>
+                        <strong>{workout.routineName}</strong>
+                        <small>{formatDuration(workout.durationSeconds)}</small>
+                        <div>
+                          <em>{workout.exercises.length} ejercicios</em>
+                          <em>{completedSets} series</em>
+                          {hasCardioEntry(workout.cardio) && <em>{formatNumber(getCardioMinutes(workout))} min cardio</em>}
+                        </div>
+                      </button>
+
+                      {isSelected && <WorkoutDetail workout={workout} />}
+                    </article>
+                  )
+                })}
               </div>
-              <strong>{formatDuration(selectedWorkout.durationSeconds)}</strong>
-            </div>
-            <div className="detail-exercises">
-              {selectedWorkout.exercises.map((exercise) => (
-                <article className="detail-exercise" key={exercise.id}>
-                  <h3>{exercise.name}</h3>
-                  <div className="detail-sets">
-                    {exercise.sets.map((set) => (
-                      <span key={set.id}>
-                        {set.setNumber}. {formatNumber(set.weight ?? 0)} kg · {set.reps ?? 0} reps
-                      </span>
-                    ))}
-                  </div>
-                </article>
-              ))}
-
-              {hasCardioEntry(selectedWorkout.cardio) && (
-                <article className="detail-exercise detail-cardio">
-                  <h3>
-                    <Activity size={17} />
-                    Cardio
-                  </h3>
-                  <div className="cardio-stats">
-                    <span>{formatCardioNumber(selectedWorkout.cardio.incline, '%')} incl.</span>
-                    <span>{formatCardioNumber(selectedWorkout.cardio.speed, 'km/h')}</span>
-                    <span>{formatCardioNumber(selectedWorkout.cardio.durationMinutes, 'min')}</span>
-                  </div>
-                </article>
-              )}
-            </div>
-          </>
-        ) : (
+            </section>
+          ))}
+        </>
+      ) : (
+        <section className="surface history-detail">
           <EmptyState icon={History} label="Sin entrenamientos" />
+        </section>
+      )}
+    </section>
+  )
+}
+
+function SummaryPill({ label, value }: { label: string; value: string }) {
+  return (
+    <article className="summary-pill">
+      <strong>{value}</strong>
+      <span>{label}</span>
+    </article>
+  )
+}
+
+function WorkoutDetail({ workout }: { workout: Workout }) {
+  return (
+    <section className="history-expanded">
+      <div className="detail-exercises">
+        {workout.exercises.map((exercise) => (
+          <article className="detail-exercise" key={exercise.id}>
+            <h3>{exercise.name}</h3>
+            <div className="detail-sets">
+              {exercise.sets.map((set) => (
+                <span key={set.id}>
+                  {set.setNumber}. {formatNumber(set.weight ?? 0)} kg · {set.reps ?? 0} reps
+                </span>
+              ))}
+            </div>
+          </article>
+        ))}
+
+        {hasCardioEntry(workout.cardio) && (
+          <article className="detail-exercise detail-cardio">
+            <h3>
+              <Activity size={17} />
+              Cardio
+            </h3>
+            <div className="cardio-stats">
+              <span>{formatCardioNumber(workout.cardio.incline, '%')} incl.</span>
+              <span>{formatCardioNumber(workout.cardio.speed, 'km/h')}</span>
+              <span>{formatCardioNumber(workout.cardio.durationMinutes, 'min')}</span>
+            </div>
+          </article>
         )}
-      </section>
+      </div>
     </section>
   )
 }
@@ -1469,6 +1510,17 @@ function getExerciseNames(workouts: Workout[]) {
   return Array.from(new Set(workouts.flatMap((workout) => workout.exercises.map((exercise) => exercise.name)))).sort((a, b) =>
     a.localeCompare(b),
   )
+}
+
+function groupWorkoutsByMonth(workouts: Workout[]) {
+  const grouped = new Map<string, Workout[]>()
+
+  workouts.forEach((workout) => {
+    const month = formatMonth(workout.date)
+    grouped.set(month, [...(grouped.get(month) ?? []), workout])
+  })
+
+  return [...grouped.entries()].map(([month, items]) => ({ month, items }))
 }
 
 function buildExerciseSeries(workouts: Workout[]) {
