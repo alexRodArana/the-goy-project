@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, ChangeEvent, Dispatch, FormEvent, ReactNode, SetStateAction } from 'react'
 import {
+  Activity,
   ArrowLeft,
   BarChart3,
   CalendarDays,
@@ -9,6 +10,7 @@ import {
   CheckCircle2,
   Cloud,
   Dumbbell,
+  Gauge,
   History,
   LayoutDashboard,
   LogOut,
@@ -40,6 +42,7 @@ import {
 import type {
   ActiveWorkout,
   AppState,
+  CardioSession,
   CheckIn,
   Routine,
   RoutineDraftExercise,
@@ -114,6 +117,19 @@ const createTrainingExercise = (exercise: RoutineDraftExercise | Routine['exerci
     completed: false,
   })),
 })
+
+const emptyCardio = (): CardioSession => ({
+  incline: null,
+  speed: null,
+  durationMinutes: null,
+  completed: false,
+})
+
+const hasCardioEntry = (cardio?: CardioSession) =>
+  Boolean(cardio && (cardio.completed || cardio.incline !== null || cardio.speed !== null || cardio.durationMinutes !== null))
+
+const formatCardioNumber = (value: number | null | undefined, suffix: string) =>
+  value === null || value === undefined ? '--' : `${formatNumber(value)} ${suffix}`
 
 const hasUserData = (value: AppState) =>
   Boolean(value.checkIns.length || value.routines.length || value.workouts.length || value.activeWorkout)
@@ -456,6 +472,7 @@ function App() {
       routineName: selectedRoutine.name,
       startedAt,
       exercises: selectedRoutine.exercises.map(createTrainingExercise),
+      cardio: emptyCardio(),
     }
 
     setNow(Date.now())
@@ -498,6 +515,25 @@ function App() {
     })
   }
 
+  const updateCardio = (field: keyof CardioSession, value: number | boolean | null) => {
+    setState((current) => {
+      if (!current.activeWorkout) {
+        return current
+      }
+
+      return {
+        ...current,
+        activeWorkout: {
+          ...current.activeWorkout,
+          cardio: {
+            ...(current.activeWorkout.cardio ?? emptyCardio()),
+            [field]: value,
+          },
+        },
+      }
+    })
+  }
+
   const finishWorkout = () => {
     if (!state.activeWorkout) {
       return
@@ -506,6 +542,7 @@ function App() {
     const endedAt = new Date().toISOString()
     const workout: Workout = {
       ...state.activeWorkout,
+      cardio: state.activeWorkout.cardio ?? emptyCardio(),
       endedAt,
       durationSeconds: Math.max(
         1,
@@ -523,7 +560,7 @@ function App() {
   }
 
   return (
-    <div className="app-shell">
+    <div className={isTrainingFocus ? 'app-shell training-focus' : 'app-shell'}>
       <header className="app-header">
         <button className="brand" aria-label="Ir a Training" type="button" onClick={() => setActiveTab('training')}>
           <span className="brand-mark">
@@ -592,6 +629,7 @@ function App() {
             setRoutineDraft={setRoutineDraft}
             setSelectedRoutineId={setSelectedRoutineId}
             startWorkout={startWorkout}
+            updateCardio={updateCardio}
             updateTrainingSet={updateTrainingSet}
           />
         )}
@@ -644,6 +682,7 @@ function TrainingView({
   setRoutineDraft,
   setSelectedRoutineId,
   startWorkout,
+  updateCardio,
   updateTrainingSet,
 }: {
   activeWorkout?: ActiveWorkout
@@ -660,6 +699,7 @@ function TrainingView({
   setRoutineDraft: Dispatch<SetStateAction<{ name: string; days: string; exercises: RoutineDraftExercise[] }>>
   setSelectedRoutineId: Dispatch<SetStateAction<string>>
   startWorkout: () => void
+  updateCardio: (field: keyof CardioSession, value: number | boolean | null) => void
   updateTrainingSet: (
     exerciseId: string,
     setId: string,
@@ -668,6 +708,12 @@ function TrainingView({
   ) => void
 }) {
   if (activeWorkout) {
+    const totalSets = activeWorkout.exercises.reduce((total, exercise) => total + exercise.sets.length, 0)
+    const completedSets = activeWorkout.exercises.reduce(
+      (total, exercise) => total + exercise.sets.filter((set) => set.completed).length,
+      0,
+    )
+
     return (
       <section className="focus-shell enter">
         <div className="workout-head surface">
@@ -677,6 +723,9 @@ function TrainingView({
               <Timer size={18} />
               {formatDuration(elapsedSeconds)}
             </strong>
+            <small>
+              {completedSets}/{totalSets} series
+            </small>
           </div>
           <button className="finish-button" type="button" onClick={finishWorkout}>
             Terminar
@@ -741,6 +790,67 @@ function TrainingView({
               </div>
             </article>
           ))}
+
+          <article className={activeWorkout.cardio.completed ? 'cardio-block complete' : 'cardio-block'}>
+            <div className="exercise-title">
+              <span>
+                <Activity size={16} />
+              </span>
+              <h2>Cardio</h2>
+            </div>
+            <div className="cardio-grid">
+              <Field label="Inclinacion">
+                <input
+                  aria-label="Inclinacion"
+                  inputMode="decimal"
+                  min="0"
+                  placeholder="%"
+                  step="0.5"
+                  type="number"
+                  value={activeWorkout.cardio.incline ?? ''}
+                  onChange={(event) =>
+                    updateCardio('incline', event.target.value === '' ? null : Number(event.target.value))
+                  }
+                />
+              </Field>
+              <Field label="Velocidad">
+                <input
+                  aria-label="Velocidad"
+                  inputMode="decimal"
+                  min="0"
+                  placeholder="km/h"
+                  step="0.1"
+                  type="number"
+                  value={activeWorkout.cardio.speed ?? ''}
+                  onChange={(event) =>
+                    updateCardio('speed', event.target.value === '' ? null : Number(event.target.value))
+                  }
+                />
+              </Field>
+              <Field label="Tiempo">
+                <input
+                  aria-label="Tiempo de cardio"
+                  inputMode="numeric"
+                  min="0"
+                  placeholder="min"
+                  step="1"
+                  type="number"
+                  value={activeWorkout.cardio.durationMinutes ?? ''}
+                  onChange={(event) =>
+                    updateCardio('durationMinutes', event.target.value === '' ? null : Number(event.target.value))
+                  }
+                />
+              </Field>
+            </div>
+            <button
+              className={activeWorkout.cardio.completed ? 'cardio-toggle complete' : 'cardio-toggle'}
+              type="button"
+              onClick={() => updateCardio('completed', !activeWorkout.cardio.completed)}
+            >
+              {activeWorkout.cardio.completed ? <CheckCircle2 size={18} /> : <Check size={18} />}
+              Cardio listo
+            </button>
+          </article>
         </div>
       </section>
     )
@@ -1026,6 +1136,20 @@ function HistoryView({
                   </div>
                 </article>
               ))}
+
+              {hasCardioEntry(selectedWorkout.cardio) && (
+                <article className="detail-exercise detail-cardio">
+                  <h3>
+                    <Activity size={17} />
+                    Cardio
+                  </h3>
+                  <div className="cardio-stats">
+                    <span>{formatCardioNumber(selectedWorkout.cardio.incline, '%')} incl.</span>
+                    <span>{formatCardioNumber(selectedWorkout.cardio.speed, 'km/h')}</span>
+                    <span>{formatCardioNumber(selectedWorkout.cardio.durationMinutes, 'min')}</span>
+                  </div>
+                </article>
+              )}
             </div>
           </>
         ) : (
@@ -1129,6 +1253,7 @@ function DashboardView({
   const currentWeight = checkIns.at(-1)?.weight
   const initialMonthWeight = sortedMonthCheckIns[0]?.weight ?? currentWeight
   const monthWorkouts = workouts.filter((workout) => workout.date.startsWith(monthKey))
+  const monthCardioMinutes = monthWorkouts.reduce((total, workout) => total + (workout.cardio.durationMinutes ?? 0), 0)
   const exerciseNames = useMemo(() => getExerciseNames(workouts), [workouts])
   const metricWeight = (value?: number) => (value ? `${formatNumber(value)} kg` : '--')
 
@@ -1156,6 +1281,7 @@ function DashboardView({
         <MetricCard icon={CalendarDays} label="Inicio mes" value={metricWeight(initialMonthWeight)} />
         <MetricCard icon={Scale} label="Actual" value={metricWeight(currentWeight)} />
         <MetricCard icon={Dumbbell} label="Entrenos mes" value={String(monthWorkouts.length)} />
+        <MetricCard icon={Gauge} label="Cardio mes" value={`${formatNumber(monthCardioMinutes)} min`} />
       </div>
 
       <section className="surface chart-card">

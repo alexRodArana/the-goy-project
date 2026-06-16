@@ -1,5 +1,5 @@
 import { initialState } from './sampleData'
-import type { ActiveWorkout, AppState, CheckIn, Routine, TrainingExercise, Workout } from './types'
+import type { ActiveWorkout, AppState, CardioSession, CheckIn, Routine, TrainingExercise, Workout } from './types'
 
 const DB_NAME = 'the-goy-project-db-v2'
 const DB_VERSION = 1
@@ -16,6 +16,29 @@ const toNumber = (value: unknown, fallback = 0) => {
 
 const toStringArray = (value: unknown) =>
   Array.isArray(value) ? value.map(String).filter(Boolean) : []
+
+const emptyCardio = (): CardioSession => ({
+  incline: null,
+  speed: null,
+  durationMinutes: null,
+  completed: false,
+})
+
+const normalizeNullableNumber = (value: unknown) =>
+  value === null || value === undefined || value === '' ? null : toNumber(value)
+
+const normalizeCardio = (value: unknown): CardioSession => {
+  if (!isRecord(value)) {
+    return emptyCardio()
+  }
+
+  return {
+    incline: normalizeNullableNumber(value.incline),
+    speed: normalizeNullableNumber(value.speed),
+    durationMinutes: normalizeNullableNumber(value.durationMinutes ?? value.time ?? value.minutes),
+    completed: Boolean(value.completed),
+  }
+}
 
 const normalizeCheckIns = (value: unknown): CheckIn[] => {
   if (!Array.isArray(value)) {
@@ -91,10 +114,10 @@ const normalizeWorkoutExercises = (workout: Record<string, unknown>, workoutInde
         const id = String(exercise.id ?? `workout-${workoutIndex + 1}-exercise-${exerciseIndex + 1}`)
 
         return {
-          id,
-          name: String(exercise.name ?? exercise.exerciseName ?? `Ejercicio ${exerciseIndex + 1}`),
-          sets: normalizeExerciseSets(id, exercise.sets),
-        }
+      id,
+      name: String(exercise.name ?? exercise.exerciseName ?? `Ejercicio ${exerciseIndex + 1}`),
+      sets: normalizeExerciseSets(id, exercise.sets),
+    }
       })
       .filter((exercise) => exercise.sets.length > 0)
   }
@@ -138,6 +161,7 @@ const normalizeWorkoutBase = (
     routineName: String(workout.routineName ?? workout.title ?? 'Entrenamiento'),
     startedAt,
     exercises: normalizeWorkoutExercises(workout, index),
+    cardio: normalizeCardio(workout.cardio),
   }
 }
 

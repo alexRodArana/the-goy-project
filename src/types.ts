@@ -36,6 +36,13 @@ export type TrainingExercise = {
   sets: TrainingSet[]
 }
 
+export type CardioSession = {
+  incline: number | null
+  speed: number | null
+  durationMinutes: number | null
+  completed: boolean
+}
+
 export type ActiveWorkout = {
   id: string
   date: string
@@ -43,6 +50,7 @@ export type ActiveWorkout = {
   routineName: string
   startedAt: string
   exercises: TrainingExercise[]
+  cardio: CardioSession
 }
 
 export type Workout = ActiveWorkout & {
