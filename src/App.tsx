@@ -15,6 +15,7 @@ import {
   LayoutDashboard,
   Mail,
   Moon,
+  Pencil,
   Play,
   Plus,
   Save,
@@ -22,6 +23,7 @@ import {
   Sun,
   Timer,
   Trash2,
+  X,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import './App.css'
@@ -50,6 +52,42 @@ import type {
   TrainingExercise,
   Workout,
 } from './types'
+
+type RoutineMode = 'home' | 'create' | 'edit'
+
+type RoutineDraft = {
+  name: string
+  days: string
+  exercises: RoutineDraftExercise[]
+}
+
+type WorkoutDraftSet = {
+  id: string
+  setNumber: number
+  weight: number | null
+  reps: number | null
+  completed: boolean
+}
+
+type WorkoutDraftExercise = {
+  id: string
+  name: string
+  sets: WorkoutDraftSet[]
+}
+
+type WorkoutDraft = {
+  date: string
+  routineName: string
+  durationMinutes: number
+  exercises: WorkoutDraftExercise[]
+  cardio: CardioSession
+}
+
+type CheckInDraft = {
+  date: string
+  weight: number
+  photo: string
+}
 
 const todayIso = () => new Date().toISOString().slice(0, 10)
 
@@ -101,6 +139,16 @@ const navItems: { key: TabKey; label: string; icon: LucideIcon }[] = [
 
 const exerciseColors = ['#2563eb', '#0f9f6e', '#d97706', '#7c3aed', '#dc2626', '#0891b2', '#be185d', '#4f46e5']
 const brandMarkSrc = `${import.meta.env.BASE_URL}app-icon-192.png`
+const trainingPhrases = [
+  'Listo para dejar de ser un Goy?',
+  'Deja de ser el top Goy.',
+  'Toca reventar vena con una rutina Kosher.',
+  'Modo Kosher: peso arriba, excusas abajo.',
+  'Menos Goy, mas reps.',
+  'Hoy no se negocia: se entrena.',
+  'Que la rutina hable por ti.',
+  'La vena no se revienta sola.',
+]
 
 const tabFromHash = (): TabKey => {
   const key = window.location.hash.replace('#', '')
@@ -112,6 +160,68 @@ const createRoutineExercise = (name = ''): RoutineDraftExercise => ({
   name,
   sets: 3,
 })
+
+const routineToDraft = (routine?: Routine): RoutineDraft => ({
+  name: routine?.name ?? '',
+  days: routine?.days.join(', ') ?? '',
+  exercises: routine?.exercises.length
+    ? routine.exercises.map((exercise) => ({ ...exercise }))
+    : [createRoutineExercise()],
+})
+
+const createWorkoutDraftSet = (setNumber = 1): WorkoutDraftSet => ({
+  id: createId('workout-set'),
+  setNumber,
+  weight: null,
+  reps: null,
+  completed: false,
+})
+
+const createWorkoutDraftExercise = (name = ''): WorkoutDraftExercise => ({
+  id: createId('workout-exercise'),
+  name,
+  sets: [createWorkoutDraftSet()],
+})
+
+const workoutToDraft = (workout: Workout): WorkoutDraft => ({
+  date: workout.date,
+  routineName: workout.routineName,
+  durationMinutes: Math.max(1, Math.round(workout.durationSeconds / 60)),
+  exercises: workout.exercises.map((exercise) => ({
+    id: exercise.id,
+    name: exercise.name,
+    sets: exercise.sets.map((set) => ({ ...set })),
+  })),
+  cardio: workout.cardio ?? emptyCardio(),
+})
+
+const draftToWorkout = (workout: Workout, draft: WorkoutDraft): Workout => {
+  const durationSeconds = Math.max(1, Math.round(Number(draft.durationMinutes) * 60))
+  const startedAt = `${draft.date}T12:00:00.000Z`
+  const endedAt = new Date(new Date(startedAt).getTime() + durationSeconds * 1000).toISOString()
+
+  return {
+    ...workout,
+    date: draft.date,
+    routineName: draft.routineName.trim() || workout.routineName,
+    startedAt,
+    endedAt,
+    durationSeconds,
+    exercises: draft.exercises
+      .map((exercise) => ({
+        id: exercise.id,
+        name: exercise.name.trim(),
+        sets: exercise.sets.map((set, index) => ({
+          ...set,
+          setNumber: index + 1,
+          weight: set.weight === null ? null : Number(set.weight),
+          reps: set.reps === null ? null : Number(set.reps),
+        })),
+      }))
+      .filter((exercise) => exercise.name && exercise.sets.length),
+    cardio: draft.cardio,
+  }
+}
 
 const createTrainingExercise = (exercise: RoutineDraftExercise | Routine['exercises'][number]): TrainingExercise => ({
   id: createId('training-exercise'),
@@ -158,6 +268,7 @@ function App() {
   const [syncStatus, setSyncStatus] = useState<'local' | 'loading' | 'synced' | 'sent' | 'error'>('local')
   const [syncCooldown, setSyncCooldown] = useState(0)
   const [activeTab, setActiveTabState] = useState<TabKey>(() => tabFromHash())
+  const [trainingPhrase] = useState(() => trainingPhrases[Math.floor(Math.random() * trainingPhrases.length)])
   const [theme, setTheme] = useState<ThemeMode>(() => {
     const storedTheme = localStorage.getItem('goy-theme')
     if (storedTheme === 'dark' || storedTheme === 'light') {
@@ -166,20 +277,19 @@ function App() {
     return 'dark'
   })
   const [selectedRoutineId, setSelectedRoutineId] = useState(initialState.routines[0]?.id ?? '')
-  const [trainingMode, setTrainingMode] = useState<'home' | 'create'>('home')
+  const [trainingMode, setTrainingMode] = useState<RoutineMode>('home')
+  const [editingRoutineId, setEditingRoutineId] = useState('')
   const [selectedHistoryId, setSelectedHistoryId] = useState('')
+  const [editingWorkoutId, setEditingWorkoutId] = useState('')
   const [visibleExercises, setVisibleExercises] = useState<Set<string>>(() => new Set())
   const [now, setNow] = useState(() => Date.now())
   const [isAddingCheckIn, setIsAddingCheckIn] = useState(false)
+  const [editingCheckInId, setEditingCheckInId] = useState('')
   const [checkInDraft, setCheckInDraft] = useState({
     weight: initialState.checkIns.at(-1)?.weight ?? 80,
     photo: '',
   })
-  const [routineDraft, setRoutineDraft] = useState({
-    name: '',
-    days: '',
-    exercises: [createRoutineExercise()],
-  })
+  const [routineDraft, setRoutineDraft] = useState<RoutineDraft>(() => routineToDraft())
 
   const applyLoadedState = useCallback((savedState: AppState) => {
     stateRef.current = savedState
@@ -353,7 +463,7 @@ function App() {
   const elapsedSeconds = state.activeWorkout
     ? Math.floor((now - new Date(state.activeWorkout.startedAt).getTime()) / 1000)
     : 0
-  const isTrainingFocus = activeTab === 'training' && Boolean(state.activeWorkout || trainingMode === 'create')
+  const isTrainingFocus = activeTab === 'training' && Boolean(state.activeWorkout || trainingMode !== 'home')
   const mainClassName = ['main', `main-${activeTab}`, isTrainingFocus ? 'main-focus' : ''].filter(Boolean).join(' ')
 
   const setActiveTab = (tab: TabKey) => {
@@ -365,7 +475,26 @@ function App() {
   }
 
   const resetRoutineDraft = () => {
-    setRoutineDraft({ name: '', days: '', exercises: [createRoutineExercise()] })
+    setRoutineDraft(routineToDraft())
+    setEditingRoutineId('')
+  }
+
+  const createRoutine = () => {
+    vibrate(10)
+    setEditingRoutineId('')
+    setRoutineDraft(routineToDraft())
+    setTrainingMode('create')
+  }
+
+  const editSelectedRoutine = () => {
+    if (!selectedRoutine) {
+      return
+    }
+
+    vibrate(10)
+    setEditingRoutineId(selectedRoutine.id)
+    setRoutineDraft(routineToDraft(selectedRoutine))
+    setTrainingMode('edit')
   }
 
   const requestSyncLink = async (event: FormEvent<HTMLFormElement>) => {
@@ -437,6 +566,28 @@ function App() {
     vibrate(18)
   }
 
+  const updateCheckIn = (entry: CheckIn) => {
+    setState((current) => ({
+      ...current,
+      checkIns: [entry, ...current.checkIns.filter((checkIn) => checkIn.id !== entry.id && checkIn.date !== entry.date)],
+    }))
+    setEditingCheckInId('')
+    vibrate(18)
+  }
+
+  const deleteCheckIn = (id: string) => {
+    if (!window.confirm('Eliminar esta entrada del timeline?')) {
+      return
+    }
+
+    setState((current) => ({
+      ...current,
+      checkIns: current.checkIns.filter((checkIn) => checkIn.id !== id),
+    }))
+    setEditingCheckInId('')
+    vibrate([12, 24, 12])
+  }
+
   const handlePhotoUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) {
@@ -451,7 +602,7 @@ function App() {
     event.preventDefault()
     const exercises = routineDraft.exercises
       .map((exercise) => ({
-        id: createId('routine-exercise'),
+        id: exercise.id.startsWith('draft-exercise') ? createId('routine-exercise') : exercise.id,
         name: exercise.name.trim(),
         sets: Math.max(1, Number(exercise.sets)),
       }))
@@ -462,7 +613,7 @@ function App() {
     }
 
     const routine: Routine = {
-      id: createId('routine'),
+      id: trainingMode === 'edit' && editingRoutineId ? editingRoutineId : createId('routine'),
       name: routineDraft.name.trim(),
       days: routineDraft.days
         .split(',')
@@ -471,11 +622,59 @@ function App() {
       exercises,
     }
 
-    setState((current) => ({ ...current, routines: [routine, ...current.routines] }))
+    setState((current) => ({
+      ...current,
+      routines:
+        trainingMode === 'edit'
+          ? current.routines.map((item) => (item.id === routine.id ? routine : item))
+          : [routine, ...current.routines],
+    }))
     setSelectedRoutineId(routine.id)
     resetRoutineDraft()
     setTrainingMode('home')
     vibrate(18)
+  }
+
+  const deleteSelectedRoutine = () => {
+    if (!selectedRoutine || !window.confirm(`Eliminar ${selectedRoutine.name}?`)) {
+      return
+    }
+
+    const nextRoutines = state.routines.filter((routine) => routine.id !== selectedRoutine.id)
+
+    setState((current) => ({
+      ...current,
+      routines: current.routines.filter((routine) => routine.id !== selectedRoutine.id),
+    }))
+    setSelectedRoutineId(nextRoutines[0]?.id ?? '')
+    resetRoutineDraft()
+    setTrainingMode('home')
+    vibrate([12, 24, 12])
+  }
+
+  const updateWorkout = (workout: Workout) => {
+    setState((current) => ({
+      ...current,
+      workouts: current.workouts.map((item) => (item.id === workout.id ? workout : item)),
+    }))
+    setEditingWorkoutId('')
+    setSelectedHistoryId(workout.id)
+    setVisibleExercises(new Set(getExerciseNames(stateRef.current.workouts.map((item) => (item.id === workout.id ? workout : item)))))
+    vibrate(18)
+  }
+
+  const deleteWorkout = (id: string) => {
+    if (!window.confirm('Eliminar este entrenamiento del historial?')) {
+      return
+    }
+
+    setState((current) => ({
+      ...current,
+      workouts: current.workouts.filter((workout) => workout.id !== id),
+    }))
+    setSelectedHistoryId('')
+    setEditingWorkoutId('')
+    vibrate([12, 24, 12])
   }
 
   const startWorkout = () => {
@@ -655,6 +854,9 @@ function App() {
         {activeTab === 'training' && (
           <TrainingView
             activeWorkout={state.activeWorkout}
+            createRoutine={createRoutine}
+            deleteSelectedRoutine={deleteSelectedRoutine}
+            editSelectedRoutine={editSelectedRoutine}
             elapsedSeconds={elapsedSeconds}
             finishWorkout={finishWorkout}
             mode={trainingMode}
@@ -664,6 +866,7 @@ function App() {
             saveRoutine={saveRoutine}
             selectedRoutine={selectedRoutine}
             selectedRoutineId={selectedRoutineId}
+            trainingPhrase={trainingPhrase}
             setMode={setTrainingMode}
             setRoutineDraft={setRoutineDraft}
             setSelectedRoutineId={setSelectedRoutineId}
@@ -675,8 +878,12 @@ function App() {
 
         {activeTab === 'history' && (
           <HistoryView
+            deleteWorkout={deleteWorkout}
+            editingWorkoutId={editingWorkoutId}
             selectedWorkout={selectedHistoryWorkout}
+            setEditingWorkoutId={setEditingWorkoutId}
             setSelectedWorkoutId={setSelectedHistoryId}
+            updateWorkout={updateWorkout}
             workouts={sortedWorkouts}
           />
         )}
@@ -685,11 +892,15 @@ function App() {
           <TimelineView
             checkInDraft={checkInDraft}
             checkIns={sortedCheckIns}
+            deleteCheckIn={deleteCheckIn}
+            editingCheckInId={editingCheckInId}
             handlePhotoUpload={handlePhotoUpload}
             isAdding={isAddingCheckIn}
             onSubmit={addCheckIn}
+            setEditingCheckInId={setEditingCheckInId}
             setCheckInDraft={setCheckInDraft}
             setIsAdding={setIsAddingCheckIn}
+            updateCheckIn={updateCheckIn}
           />
         )}
 
@@ -708,6 +919,9 @@ function App() {
 
 function TrainingView({
   activeWorkout,
+  createRoutine,
+  deleteSelectedRoutine,
+  editSelectedRoutine,
   elapsedSeconds,
   finishWorkout,
   mode,
@@ -717,6 +931,7 @@ function TrainingView({
   saveRoutine,
   selectedRoutine,
   selectedRoutineId,
+  trainingPhrase,
   setMode,
   setRoutineDraft,
   setSelectedRoutineId,
@@ -725,17 +940,21 @@ function TrainingView({
   updateTrainingSet,
 }: {
   activeWorkout?: ActiveWorkout
+  createRoutine: () => void
+  deleteSelectedRoutine: () => void
+  editSelectedRoutine: () => void
   elapsedSeconds: number
   finishWorkout: () => void
-  mode: 'home' | 'create'
+  mode: RoutineMode
   resetRoutineDraft: () => void
-  routineDraft: { name: string; days: string; exercises: RoutineDraftExercise[] }
+  routineDraft: RoutineDraft
   routines: Routine[]
   saveRoutine: (event: FormEvent<HTMLFormElement>) => void
   selectedRoutine?: Routine
   selectedRoutineId: string
-  setMode: Dispatch<SetStateAction<'home' | 'create'>>
-  setRoutineDraft: Dispatch<SetStateAction<{ name: string; days: string; exercises: RoutineDraftExercise[] }>>
+  trainingPhrase: string
+  setMode: Dispatch<SetStateAction<RoutineMode>>
+  setRoutineDraft: Dispatch<SetStateAction<RoutineDraft>>
   setSelectedRoutineId: Dispatch<SetStateAction<string>>
   startWorkout: () => void
   updateCardio: (field: keyof CardioSession, value: number | boolean | null) => void
@@ -901,7 +1120,9 @@ function TrainingView({
     )
   }
 
-  if (mode === 'create') {
+  if (mode !== 'home') {
+    const isEditing = mode === 'edit'
+
     return (
       <section className="routine-create enter">
         <form className="surface routine-form focused" onSubmit={saveRoutine}>
@@ -919,7 +1140,7 @@ function TrainingView({
             >
               <ArrowLeft size={18} />
             </button>
-            <strong>Nueva rutina</strong>
+            <strong>{isEditing ? 'Editar rutina' : 'Nueva rutina'}</strong>
           </div>
 
           <Field label="Nombre">
@@ -1017,6 +1238,7 @@ function TrainingView({
 
   return (
     <section className="training-home enter">
+      <h1 className="training-phrase">{trainingPhrase}</h1>
       <div className="surface start-card">
         {routines.length ? (
           <>
@@ -1033,12 +1255,29 @@ function TrainingView({
                 className="icon-button"
                 data-tooltip="Nueva rutina"
                 type="button"
-                onClick={() => {
-                  vibrate(10)
-                  setMode('create')
-                }}
+                onClick={createRoutine}
               >
                 <Plus size={19} />
+              </button>
+              <button
+                aria-label="Editar rutina"
+                className="icon-button"
+                data-tooltip="Editar rutina"
+                disabled={!selectedRoutine}
+                type="button"
+                onClick={editSelectedRoutine}
+              >
+                <Pencil size={18} />
+              </button>
+              <button
+                aria-label="Eliminar rutina"
+                className="icon-button danger"
+                data-tooltip="Eliminar rutina"
+                disabled={!selectedRoutine}
+                type="button"
+                onClick={deleteSelectedRoutine}
+              >
+                <Trash2 size={18} />
               </button>
             </div>
 
@@ -1051,10 +1290,7 @@ function TrainingView({
           <button
             className="first-routine-button"
             type="button"
-            onClick={() => {
-              vibrate(10)
-              setMode('create')
-            }}
+            onClick={createRoutine}
           >
             <Plus size={20} />
             Crear rutina
@@ -1133,12 +1369,20 @@ function SyncPanel({
 }
 
 function HistoryView({
+  deleteWorkout,
+  editingWorkoutId,
   selectedWorkout,
+  setEditingWorkoutId,
   setSelectedWorkoutId,
+  updateWorkout,
   workouts,
 }: {
+  deleteWorkout: (id: string) => void
+  editingWorkoutId: string
   selectedWorkout?: Workout
+  setEditingWorkoutId: Dispatch<SetStateAction<string>>
   setSelectedWorkoutId: Dispatch<SetStateAction<string>>
+  updateWorkout: (workout: Workout) => void
   workouts: Workout[]
 }) {
   const groupedWorkouts = groupWorkoutsByMonth(workouts)
@@ -1159,6 +1403,7 @@ function HistoryView({
                       type="button"
                       onClick={() => {
                         vibrate(8)
+                        setEditingWorkoutId('')
                         setSelectedWorkoutId((current) => (current === workout.id ? '' : workout.id))
                       }}
                     >
@@ -1167,7 +1412,24 @@ function HistoryView({
                       <small>{formatDuration(workout.durationSeconds)}</small>
                     </button>
 
-                    {isSelected && <WorkoutDetail workout={workout} />}
+                    {isSelected &&
+                      (editingWorkoutId === workout.id ? (
+                        <WorkoutEditor
+                          key={workout.id}
+                          onCancel={() => setEditingWorkoutId('')}
+                          onSave={updateWorkout}
+                          workout={workout}
+                        />
+                      ) : (
+                        <WorkoutDetail
+                          onDelete={() => deleteWorkout(workout.id)}
+                          onEdit={() => {
+                            vibrate(10)
+                            setEditingWorkoutId(workout.id)
+                          }}
+                          workout={workout}
+                        />
+                      ))}
                   </article>
                 )
               })}
@@ -1183,9 +1445,27 @@ function HistoryView({
   )
 }
 
-function WorkoutDetail({ workout }: { workout: Workout }) {
+function WorkoutDetail({
+  onDelete,
+  onEdit,
+  workout,
+}: {
+  onDelete: () => void
+  onEdit: () => void
+  workout: Workout
+}) {
   return (
     <section className="history-expanded">
+      <div className="history-actions">
+        <button className="secondary-button compact" type="button" onClick={onEdit}>
+          <Pencil size={16} />
+          Editar
+        </button>
+        <button className="secondary-button compact danger-text" type="button" onClick={onDelete}>
+          <Trash2 size={16} />
+          Eliminar
+        </button>
+      </div>
       <div className="detail-exercises">
         {workout.exercises.map((exercise) => (
           <article className="detail-exercise" key={exercise.id}>
@@ -1218,22 +1498,302 @@ function WorkoutDetail({ workout }: { workout: Workout }) {
   )
 }
 
+function WorkoutEditor({
+  onCancel,
+  onSave,
+  workout,
+}: {
+  onCancel: () => void
+  onSave: (workout: Workout) => void
+  workout: Workout
+}) {
+  const [draft, setDraft] = useState<WorkoutDraft>(() => workoutToDraft(workout))
+
+  const updateExercise = (exerciseId: string, patch: Partial<WorkoutDraftExercise>) => {
+    setDraft((current) => ({
+      ...current,
+      exercises: current.exercises.map((exercise) => (exercise.id === exerciseId ? { ...exercise, ...patch } : exercise)),
+    }))
+  }
+
+  const updateSet = (exerciseId: string, setId: string, patch: Partial<WorkoutDraftSet>) => {
+    setDraft((current) => ({
+      ...current,
+      exercises: current.exercises.map((exercise) =>
+        exercise.id === exerciseId
+          ? {
+              ...exercise,
+              sets: exercise.sets.map((set) => (set.id === setId ? { ...set, ...patch } : set)),
+            }
+          : exercise,
+      ),
+    }))
+  }
+
+  const removeSet = (exerciseId: string, setId: string) => {
+    setDraft((current) => ({
+      ...current,
+      exercises: current.exercises.map((exercise) =>
+        exercise.id === exerciseId
+          ? {
+              ...exercise,
+              sets:
+                exercise.sets.length > 1
+                  ? exercise.sets.filter((set) => set.id !== setId).map((set, index) => ({ ...set, setNumber: index + 1 }))
+                  : exercise.sets,
+            }
+          : exercise,
+      ),
+    }))
+  }
+
+  const addSet = (exerciseId: string) => {
+    setDraft((current) => ({
+      ...current,
+      exercises: current.exercises.map((exercise) =>
+        exercise.id === exerciseId
+          ? {
+              ...exercise,
+              sets: [...exercise.sets, createWorkoutDraftSet(exercise.sets.length + 1)],
+            }
+          : exercise,
+      ),
+    }))
+  }
+
+  const removeExercise = (exerciseId: string) => {
+    setDraft((current) => ({
+      ...current,
+      exercises:
+        current.exercises.length > 1 ? current.exercises.filter((exercise) => exercise.id !== exerciseId) : current.exercises,
+    }))
+  }
+
+  const addExercise = () => {
+    setDraft((current) => ({
+      ...current,
+      exercises: [...current.exercises, createWorkoutDraftExercise()],
+    }))
+  }
+
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    onSave(draftToWorkout(workout, draft))
+  }
+
+  return (
+    <form className="history-expanded workout-editor" onSubmit={submit}>
+      <div className="editor-grid">
+        <Field label="Fecha">
+          <input
+            required
+            type="date"
+            value={draft.date}
+            onChange={(event) => setDraft((current) => ({ ...current, date: event.target.value }))}
+          />
+        </Field>
+        <Field label="Rutina">
+          <input
+            required
+            value={draft.routineName}
+            onChange={(event) => setDraft((current) => ({ ...current, routineName: event.target.value }))}
+          />
+        </Field>
+        <Field label="Duracion min">
+          <input
+            min="1"
+            required
+            type="number"
+            value={draft.durationMinutes}
+            onChange={(event) => setDraft((current) => ({ ...current, durationMinutes: Math.max(1, Number(event.target.value) || 1) }))}
+          />
+        </Field>
+      </div>
+
+      <div className="editor-exercises">
+        {draft.exercises.map((exercise, exerciseIndex) => (
+          <article className="editor-exercise" key={exercise.id}>
+            <div className="editor-head">
+              <input
+                aria-label="Ejercicio"
+                placeholder={`Ejercicio ${exerciseIndex + 1}`}
+                required
+                value={exercise.name}
+                onChange={(event) => updateExercise(exercise.id, { name: event.target.value })}
+              />
+              <button
+                aria-label="Eliminar ejercicio"
+                className="icon-button flat danger-text"
+                data-tooltip="Eliminar ejercicio"
+                disabled={draft.exercises.length === 1}
+                type="button"
+                onClick={() => {
+                  vibrate(8)
+                  removeExercise(exercise.id)
+                }}
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
+
+            <div className="editor-sets">
+              {exercise.sets.map((set) => (
+                <div className={set.completed ? 'editor-set complete' : 'editor-set'} key={set.id}>
+                  <button
+                    aria-label={set.completed ? 'Marcar pendiente' : 'Completar serie'}
+                    className="complete-toggle"
+                    type="button"
+                    onClick={() => {
+                      vibrate(8)
+                      updateSet(exercise.id, set.id, { completed: !set.completed })
+                    }}
+                  >
+                    {set.completed ? <CheckCircle2 size={16} /> : <Check size={16} />}
+                  </button>
+                  <strong>{set.setNumber}</strong>
+                  <input
+                    aria-label="Peso"
+                    inputMode="decimal"
+                    min="0"
+                    placeholder="kg"
+                    step="0.5"
+                    type="number"
+                    value={set.weight ?? ''}
+                    onChange={(event) => updateSet(exercise.id, set.id, { weight: event.target.value === '' ? null : Number(event.target.value) })}
+                  />
+                  <input
+                    aria-label="Reps"
+                    inputMode="numeric"
+                    min="0"
+                    placeholder="reps"
+                    type="number"
+                    value={set.reps ?? ''}
+                    onChange={(event) => updateSet(exercise.id, set.id, { reps: event.target.value === '' ? null : Number(event.target.value) })}
+                  />
+                  <button
+                    aria-label="Eliminar serie"
+                    className="icon-button flat danger-text"
+                    disabled={exercise.sets.length === 1}
+                    type="button"
+                    onClick={() => {
+                      vibrate(8)
+                      removeSet(exercise.id, set.id)
+                    }}
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <button className="secondary-button compact add-set-button" type="button" onClick={() => addSet(exercise.id)}>
+              <Plus size={16} />
+              Serie
+            </button>
+          </article>
+        ))}
+      </div>
+
+      <button className="secondary-button compact" type="button" onClick={addExercise}>
+        <Plus size={16} />
+        Ejercicio
+      </button>
+
+      <section className="editor-cardio">
+        <div className="cardio-grid">
+          <Field label="Inclinacion">
+            <input
+              inputMode="decimal"
+              min="0"
+              step="0.5"
+              type="number"
+              value={draft.cardio.incline ?? ''}
+              onChange={(event) =>
+                setDraft((current) => ({
+                  ...current,
+                  cardio: { ...current.cardio, incline: event.target.value === '' ? null : Number(event.target.value) },
+                }))
+              }
+            />
+          </Field>
+          <Field label="Velocidad">
+            <input
+              inputMode="decimal"
+              min="0"
+              step="0.1"
+              type="number"
+              value={draft.cardio.speed ?? ''}
+              onChange={(event) =>
+                setDraft((current) => ({
+                  ...current,
+                  cardio: { ...current.cardio, speed: event.target.value === '' ? null : Number(event.target.value) },
+                }))
+              }
+            />
+          </Field>
+          <Field label="Tiempo">
+            <input
+              inputMode="numeric"
+              min="0"
+              step="1"
+              type="number"
+              value={draft.cardio.durationMinutes ?? ''}
+              onChange={(event) =>
+                setDraft((current) => ({
+                  ...current,
+                  cardio: { ...current.cardio, durationMinutes: event.target.value === '' ? null : Number(event.target.value) },
+                }))
+              }
+            />
+          </Field>
+        </div>
+        <button
+          className={draft.cardio.completed ? 'cardio-toggle complete' : 'cardio-toggle'}
+          type="button"
+          onClick={() => setDraft((current) => ({ ...current, cardio: { ...current.cardio, completed: !current.cardio.completed } }))}
+        >
+          {draft.cardio.completed ? <CheckCircle2 size={18} /> : <Check size={18} />}
+          Cardio listo
+        </button>
+      </section>
+
+      <div className="editor-actions">
+        <button className="secondary-button" type="button" onClick={onCancel}>
+          Cancelar
+        </button>
+        <button className="primary-button compact" type="submit">
+          <Save size={17} />
+          Guardar
+        </button>
+      </div>
+    </form>
+  )
+}
+
 function TimelineView({
   checkInDraft,
   checkIns,
+  deleteCheckIn,
+  editingCheckInId,
   handlePhotoUpload,
   isAdding,
   onSubmit,
+  setEditingCheckInId,
   setCheckInDraft,
   setIsAdding,
+  updateCheckIn,
 }: {
   checkInDraft: { weight: number; photo: string }
   checkIns: CheckIn[]
+  deleteCheckIn: (id: string) => void
+  editingCheckInId: string
   handlePhotoUpload: (event: ChangeEvent<HTMLInputElement>) => void
   isAdding: boolean
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
+  setEditingCheckInId: Dispatch<SetStateAction<string>>
   setCheckInDraft: Dispatch<SetStateAction<{ weight: number; photo: string }>>
   setIsAdding: Dispatch<SetStateAction<boolean>>
+  updateCheckIn: (entry: CheckIn) => void
 }) {
   return (
     <section className="timeline-horizontal enter">
@@ -1241,15 +1801,50 @@ function TimelineView({
         {checkIns.map((checkIn) => (
           <article className="timeline-item" key={checkIn.id}>
             <div className="timeline-dot" />
-            <div className="vertical-photo-card">
-              {checkIn.photo ? (
-                <img alt={`Foto ${formatDate(checkIn.date)}`} src={checkIn.photo} />
-              ) : (
-                <Camera size={32} />
-              )}
-              <strong>{formatNumber(checkIn.weight)} kg</strong>
-            </div>
-            <time>{formatShortDate(checkIn.date)}</time>
+            {editingCheckInId === checkIn.id ? (
+              <CheckInEditor
+                key={checkIn.id}
+                checkIn={checkIn}
+                onCancel={() => setEditingCheckInId('')}
+                onSave={updateCheckIn}
+              />
+            ) : (
+              <>
+                <div className="vertical-photo-card">
+                  <div className="timeline-actions">
+                    <button
+                      aria-label="Editar entrada"
+                      className="icon-button glass"
+                      data-tooltip="Editar"
+                      type="button"
+                      onClick={() => {
+                        vibrate(10)
+                        setIsAdding(false)
+                        setEditingCheckInId(checkIn.id)
+                      }}
+                    >
+                      <Pencil size={15} />
+                    </button>
+                    <button
+                      aria-label="Eliminar entrada"
+                      className="icon-button glass danger-text"
+                      data-tooltip="Eliminar"
+                      type="button"
+                      onClick={() => deleteCheckIn(checkIn.id)}
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
+                  {checkIn.photo ? (
+                    <img alt={`Foto ${formatDate(checkIn.date)}`} src={checkIn.photo} />
+                  ) : (
+                    <Camera size={32} />
+                  )}
+                  <strong>{formatNumber(checkIn.weight)} kg</strong>
+                </div>
+                <time>{formatShortDate(checkIn.date)}</time>
+              </>
+            )}
           </article>
         ))}
 
@@ -1297,6 +1892,7 @@ function TimelineView({
               type="button"
               onClick={() => {
                 vibrate(10)
+                setEditingCheckInId('')
                 setIsAdding(true)
               }}
             >
@@ -1307,6 +1903,78 @@ function TimelineView({
         </article>
       </div>
     </section>
+  )
+}
+
+function CheckInEditor({
+  checkIn,
+  onCancel,
+  onSave,
+}: {
+  checkIn: CheckIn
+  onCancel: () => void
+  onSave: (entry: CheckIn) => void
+}) {
+  const [draft, setDraft] = useState<CheckInDraft>(() => ({
+    date: checkIn.date,
+    weight: checkIn.weight,
+    photo: checkIn.photo ?? '',
+  }))
+
+  const uploadPhoto = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) {
+      return
+    }
+
+    const photo = await readPhotoAsDataUrl(file)
+    setDraft((current) => ({ ...current, photo }))
+  }
+
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    onSave({
+      id: checkIn.id,
+      date: draft.date,
+      weight: Number(draft.weight),
+      photo: draft.photo || undefined,
+    })
+  }
+
+  return (
+    <form className="surface add-checkin timeline-edit-form" onSubmit={submit}>
+      <label className="mini-photo-drop" data-tooltip="Foto">
+        {draft.photo ? <img alt="Foto seleccionada" src={draft.photo} /> : <Camera size={26} />}
+        <input accept="image/*" hidden type="file" onChange={uploadPhoto} />
+      </label>
+      <Field label="Fecha">
+        <input
+          required
+          type="date"
+          value={draft.date}
+          onChange={(event) => setDraft((current) => ({ ...current, date: event.target.value }))}
+        />
+      </Field>
+      <Field label="Peso">
+        <input
+          min="0"
+          required
+          step="0.1"
+          type="number"
+          value={draft.weight}
+          onChange={(event) => setDraft((current) => ({ ...current, weight: Number(event.target.value) }))}
+        />
+      </Field>
+      <div className="button-row">
+        <button aria-label="Cancelar" className="secondary-button" type="button" onClick={onCancel}>
+          <ArrowLeft size={17} />
+        </button>
+        <button className="primary-button compact" type="submit">
+          <Save size={17} />
+          Guardar
+        </button>
+      </div>
+    </form>
   )
 }
 
