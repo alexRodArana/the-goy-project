@@ -70,11 +70,13 @@ const formatShortDate = (value: string) =>
     month: 'short',
   }).format(toLocalDate(value))
 
-const formatMonth = (value: string) =>
-  new Intl.DateTimeFormat('es-MX', {
+const formatMonth = (value: string) => {
+  const label = new Intl.DateTimeFormat('es-MX', {
     month: 'long',
     year: 'numeric',
   }).format(toLocalDate(value))
+  return `${label.charAt(0).toUpperCase()}${label.slice(1)}`
+}
 
 const formatNumber = (value: number) =>
   new Intl.NumberFormat('es-MX', {
@@ -133,13 +135,17 @@ const emptyCardio = (): CardioSession => ({
 const hasCardioEntry = (cardio?: CardioSession) =>
   Boolean(cardio && (cardio.completed || cardio.incline !== null || cardio.speed !== null || cardio.durationMinutes !== null))
 
-const getCardioMinutes = (workout: Workout) => workout.cardio.durationMinutes ?? 0
-
 const formatCardioNumber = (value: number | null | undefined, suffix: string) =>
   value === null || value === undefined ? '--' : `${formatNumber(value)} ${suffix}`
 
 const hasUserData = (value: AppState) =>
   Boolean(value.checkIns.length || value.routines.length || value.workouts.length || value.activeWorkout)
+
+const vibrate = (pattern: number | number[] = 10) => {
+  if ('vibrate' in navigator) {
+    navigator.vibrate(pattern)
+  }
+}
 
 function App() {
   const [state, setState] = useState<AppState>(initialState)
@@ -157,7 +163,7 @@ function App() {
     if (storedTheme === 'dark' || storedTheme === 'light') {
       return storedTheme
     }
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+    return 'dark'
   })
   const [selectedRoutineId, setSelectedRoutineId] = useState(initialState.routines[0]?.id ?? '')
   const [trainingMode, setTrainingMode] = useState<'home' | 'create'>('home')
@@ -179,7 +185,7 @@ function App() {
     stateRef.current = savedState
     setState(savedState)
     setSelectedRoutineId(savedState.routines[0]?.id ?? '')
-    setSelectedHistoryId([...savedState.workouts].sort((a, b) => b.date.localeCompare(a.date))[0]?.id ?? '')
+    setSelectedHistoryId('')
     setVisibleExercises(new Set(getExerciseNames(savedState.workouts)))
 
     const latestCheckIn = [...savedState.checkIns].sort((a, b) => b.date.localeCompare(a.date))[0]
@@ -343,13 +349,17 @@ function App() {
     [state.workouts],
   )
   const selectedRoutine = state.routines.find((routine) => routine.id === selectedRoutineId) ?? state.routines[0]
-  const selectedHistoryWorkout = sortedWorkouts.find((workout) => workout.id === selectedHistoryId) ?? sortedWorkouts[0]
+  const selectedHistoryWorkout = sortedWorkouts.find((workout) => workout.id === selectedHistoryId)
   const elapsedSeconds = state.activeWorkout
     ? Math.floor((now - new Date(state.activeWorkout.startedAt).getTime()) / 1000)
     : 0
   const isTrainingFocus = activeTab === 'training' && Boolean(state.activeWorkout || trainingMode === 'create')
+  const mainClassName = ['main', `main-${activeTab}`, isTrainingFocus ? 'main-focus' : ''].filter(Boolean).join(' ')
 
   const setActiveTab = (tab: TabKey) => {
+    if (tab !== activeTab) {
+      vibrate(8)
+    }
     setActiveTabState(tab)
     window.history.replaceState(null, '', `#${tab}`)
   }
@@ -424,6 +434,7 @@ function App() {
     }))
     setCheckInDraft((draft) => ({ ...draft, photo: '' }))
     setIsAddingCheckIn(false)
+    vibrate(18)
   }
 
   const handlePhotoUpload = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -464,6 +475,7 @@ function App() {
     setSelectedRoutineId(routine.id)
     resetRoutineDraft()
     setTrainingMode('home')
+    vibrate(18)
   }
 
   const startWorkout = () => {
@@ -485,6 +497,7 @@ function App() {
     setNow(Date.now())
     setTrainingMode('home')
     setState((current) => ({ ...current, activeWorkout: workout }))
+    vibrate(20)
   }
 
   const updateTrainingSet = (
@@ -564,6 +577,7 @@ function App() {
     }))
     setSelectedHistoryId(workout.id)
     setActiveTab('history')
+    vibrate([18, 30, 22])
   }
 
   return (
@@ -583,7 +597,10 @@ function App() {
               className={syncStatus === 'error' ? 'account-status error' : 'account-status'}
               data-tooltip={syncStatus === 'error' ? 'Error de sync' : 'Registrado'}
               type="button"
-              onClick={disconnectSync}
+              onClick={() => {
+                vibrate(10)
+                void disconnectSync()
+              }}
             >
               {syncStatus === 'error' ? <Cloud size={17} /> : <CheckCircle2 size={17} />}
             </button>
@@ -593,7 +610,10 @@ function App() {
             className="icon-button"
             data-tooltip={theme === 'dark' ? 'Tema claro' : 'Tema oscuro'}
             type="button"
-            onClick={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))}
+            onClick={() => {
+              vibrate(8)
+              setTheme((current) => (current === 'dark' ? 'light' : 'dark'))
+            }}
           >
             {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
           </button>
@@ -618,7 +638,7 @@ function App() {
         })}
       </nav>
 
-      <main className={isTrainingFocus ? 'main main-focus' : 'main'}>
+      <main className={mainClassName}>
         <SyncPanel
           email={syncEmail}
           isConfigured={isSupabaseConfigured}
@@ -766,7 +786,10 @@ function TrainingView({
                       className="complete-toggle"
                       data-tooltip="Completar"
                       type="button"
-                      onClick={() => updateTrainingSet(exercise.id, set.id, 'completed', !set.completed)}
+                      onClick={() => {
+                        vibrate(8)
+                        updateTrainingSet(exercise.id, set.id, 'completed', !set.completed)
+                      }}
                     >
                       {set.completed ? <CheckCircle2 size={18} /> : <Check size={18} />}
                     </button>
@@ -864,7 +887,10 @@ function TrainingView({
             <button
               className={activeWorkout.cardio.completed ? 'cardio-toggle complete' : 'cardio-toggle'}
               type="button"
-              onClick={() => updateCardio('completed', !activeWorkout.cardio.completed)}
+              onClick={() => {
+                vibrate(8)
+                updateCardio('completed', !activeWorkout.cardio.completed)
+              }}
             >
               {activeWorkout.cardio.completed ? <CheckCircle2 size={18} /> : <Check size={18} />}
               Cardio listo
@@ -886,6 +912,7 @@ function TrainingView({
               data-tooltip="Volver"
               type="button"
               onClick={() => {
+                vibrate(8)
                 resetRoutineDraft()
                 setMode('home')
               }}
@@ -948,12 +975,13 @@ function TrainingView({
                   data-tooltip="Eliminar"
                   disabled={routineDraft.exercises.length === 1}
                   type="button"
-                  onClick={() =>
+                  onClick={() => {
+                    vibrate(8)
                     setRoutineDraft((draft) => ({
                       ...draft,
                       exercises: draft.exercises.filter((row) => row.id !== exercise.id),
                     }))
-                  }
+                  }}
                 >
                   <Trash2 size={16} />
                 </button>
@@ -967,12 +995,13 @@ function TrainingView({
               className="secondary-button"
               data-tooltip="Agregar ejercicio"
               type="button"
-              onClick={() =>
+              onClick={() => {
+                vibrate(8)
                 setRoutineDraft((draft) => ({
                   ...draft,
                   exercises: [...draft.exercises, createRoutineExercise()],
                 }))
-              }
+              }}
             >
               <Plus size={17} />
             </button>
@@ -1004,7 +1033,10 @@ function TrainingView({
                 className="icon-button"
                 data-tooltip="Nueva rutina"
                 type="button"
-                onClick={() => setMode('create')}
+                onClick={() => {
+                  vibrate(10)
+                  setMode('create')
+                }}
               >
                 <Plus size={19} />
               </button>
@@ -1016,7 +1048,14 @@ function TrainingView({
             </button>
           </>
         ) : (
-          <button className="first-routine-button" type="button" onClick={() => setMode('create')}>
+          <button
+            className="first-routine-button"
+            type="button"
+            onClick={() => {
+              vibrate(10)
+              setMode('create')
+            }}
+          >
             <Plus size={20} />
             Crear rutina
           </button>
@@ -1102,67 +1141,45 @@ function HistoryView({
   setSelectedWorkoutId: Dispatch<SetStateAction<string>>
   workouts: Workout[]
 }) {
-  const totalSeconds = workouts.reduce((total, workout) => total + workout.durationSeconds, 0)
-  const cardioMinutes = workouts.reduce((total, workout) => total + getCardioMinutes(workout), 0)
   const groupedWorkouts = groupWorkoutsByMonth(workouts)
 
   return (
     <section className={workouts.length ? 'history-feed enter' : 'history-feed history-empty enter'}>
       {workouts.length ? (
-        <>
-          <div className="history-summary">
-            <SummaryPill label="Entrenos" value={String(workouts.length)} />
-            <SummaryPill label="Tiempo" value={formatDuration(totalSeconds)} />
-            <SummaryPill label="Cardio" value={`${formatNumber(cardioMinutes)} min`} />
-          </div>
+        groupedWorkouts.map(({ month, items }) => (
+          <section className="history-month" key={month}>
+            <h2>{month}</h2>
+            <div className="history-cards">
+              {items.map((workout) => {
+                const isSelected = selectedWorkout?.id === workout.id
 
-          {groupedWorkouts.map(({ month, items }) => (
-            <section className="history-month" key={month}>
-              <h2>{month}</h2>
-              <div className="history-cards">
-                {items.map((workout) => {
-                  const isSelected = selectedWorkout?.id === workout.id
-                  const completedSets = workout.exercises.reduce(
-                    (total, exercise) => total + exercise.sets.filter((set) => set.completed).length,
-                    0,
-                  )
+                return (
+                  <article className={isSelected ? 'history-card selected' : 'history-card'} key={workout.id}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        vibrate(8)
+                        setSelectedWorkoutId((current) => (current === workout.id ? '' : workout.id))
+                      }}
+                    >
+                      <span>{formatShortDate(workout.date)}</span>
+                      <strong>{workout.routineName}</strong>
+                      <small>{formatDuration(workout.durationSeconds)}</small>
+                    </button>
 
-                  return (
-                    <article className={isSelected ? 'history-card selected' : 'history-card'} key={workout.id}>
-                      <button type="button" onClick={() => setSelectedWorkoutId(workout.id)}>
-                        <span>{formatShortDate(workout.date)}</span>
-                        <strong>{workout.routineName}</strong>
-                        <small>{formatDuration(workout.durationSeconds)}</small>
-                        <div>
-                          <em>{workout.exercises.length} ejercicios</em>
-                          <em>{completedSets} series</em>
-                          {hasCardioEntry(workout.cardio) && <em>{formatNumber(getCardioMinutes(workout))} min cardio</em>}
-                        </div>
-                      </button>
-
-                      {isSelected && <WorkoutDetail workout={workout} />}
-                    </article>
-                  )
-                })}
-              </div>
-            </section>
-          ))}
-        </>
+                    {isSelected && <WorkoutDetail workout={workout} />}
+                  </article>
+                )
+              })}
+            </div>
+          </section>
+        ))
       ) : (
         <section className="surface history-detail">
           <EmptyState icon={History} label="Sin entrenamientos" />
         </section>
       )}
     </section>
-  )
-}
-
-function SummaryPill({ label, value }: { label: string; value: string }) {
-  return (
-    <article className="summary-pill">
-      <strong>{value}</strong>
-      <span>{label}</span>
-    </article>
   )
 }
 
@@ -1256,7 +1273,15 @@ function TimelineView({
                 />
               </Field>
               <div className="button-row">
-                <button aria-label="Cancelar" className="secondary-button" type="button" onClick={() => setIsAdding(false)}>
+                <button
+                  aria-label="Cancelar"
+                  className="secondary-button"
+                  type="button"
+                  onClick={() => {
+                    vibrate(8)
+                    setIsAdding(false)
+                  }}
+                >
                   <ArrowLeft size={17} />
                 </button>
                 <button className="primary-button compact" type="submit">
@@ -1266,7 +1291,15 @@ function TimelineView({
               </div>
             </form>
           ) : (
-            <button aria-label="Agregar foto y peso" className="add-photo-button" type="button" onClick={() => setIsAdding(true)}>
+            <button
+              aria-label="Agregar foto y peso"
+              className="add-photo-button"
+              type="button"
+              onClick={() => {
+                vibrate(10)
+                setIsAdding(true)
+              }}
+            >
               <Plus size={26} />
             </button>
           )}
@@ -1305,6 +1338,7 @@ function DashboardView({
   }, [exerciseNames, setVisibleExercises, visibleExercises.size])
 
   const toggleExercise = (name: string) => {
+    vibrate(8)
     setVisibleExercises((current) => {
       const next = new Set(current)
       if (next.has(name)) {
