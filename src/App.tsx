@@ -90,6 +90,7 @@ const navItems: { key: TabKey; label: string; icon: LucideIcon }[] = [
 ]
 
 const exerciseColors = ['#2563eb', '#0f9f6e', '#d97706', '#7c3aed', '#dc2626', '#0891b2', '#be185d', '#4f46e5']
+const brandMarkSrc = `${import.meta.env.BASE_URL}app-icon-192.png`
 
 const tabFromHash = (): TabKey => {
   const key = window.location.hash.replace('#', '')
@@ -526,7 +527,7 @@ function App() {
       <header className="app-header">
         <button className="brand" aria-label="Ir a Training" type="button" onClick={() => setActiveTab('training')}>
           <span className="brand-mark">
-            <Dumbbell size={19} />
+            <img alt="" src={brandMarkSrc} />
           </span>
           <span>The Goy Project</span>
         </button>

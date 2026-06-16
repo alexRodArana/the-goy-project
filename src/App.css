@@ -43,10 +43,18 @@
   justify-content: center;
   width: 40px;
   height: 40px;
-  color: var(--brand-ink);
-  background: var(--brand-soft);
-  border: 1px solid var(--brand-line);
-  border-radius: 8px;
+  overflow: hidden;
+  background: #030303;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: var(--shadow-soft);
+}
+
+.brand-mark img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .tabs {

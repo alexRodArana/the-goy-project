@@ -1,6 +1,12 @@
-const CACHE_NAME = 'the-goy-project-v2'
+const CACHE_NAME = 'the-goy-project-v3'
 const SCOPE = self.registration.scope
-const APP_SHELL = [SCOPE, `${SCOPE}manifest.webmanifest`, `${SCOPE}favicon.svg`]
+const APP_SHELL = [
+  SCOPE,
+  `${SCOPE}manifest.webmanifest`,
+  `${SCOPE}favicon.png`,
+  `${SCOPE}apple-touch-icon.png`,
+  `${SCOPE}app-icon-192.png`,
+]
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)))
