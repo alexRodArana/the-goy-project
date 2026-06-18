@@ -315,8 +315,21 @@
 
 .routine-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 82px 38px;
+  grid-template-columns: minmax(0, 1fr) 82px 38px 38px;
   gap: 8px;
+}
+
+.order-controls {
+  display: grid;
+  gap: 4px;
+}
+
+.order-controls .icon-button.flat {
+  width: 38px;
+  min-height: 19px;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--line);
 }
 
 .button-row {
@@ -340,9 +353,27 @@
   position: sticky;
   top: 92px;
   z-index: 10;
+  flex-wrap: wrap;
   padding: 14px;
   background: color-mix(in srgb, var(--surface) 92%, transparent);
   backdrop-filter: blur(14px);
+}
+
+.workout-progress {
+  flex: 1 0 100%;
+  height: 9px;
+  overflow: hidden;
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+
+.workout-progress span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--brand), var(--ok));
+  border-radius: inherit;
+  transition: width 240ms ease;
 }
 
 .workout-head span,
@@ -1627,13 +1658,23 @@ button:not(:disabled):active {
   }
 
   .routine-row {
-    grid-template-columns: minmax(0, 1fr) 70px 40px;
+    grid-template-columns: minmax(0, 1fr) 64px 36px 40px;
     gap: 7px;
   }
 
   .routine-row .icon-button.flat {
-    width: 40px;
+    width: 36px;
     min-height: 44px;
+  }
+
+  .order-controls {
+    gap: 5px;
+  }
+
+  .order-controls .icon-button.flat {
+    width: 36px;
+    min-height: 19px;
+    border-radius: 10px;
   }
 
   .button-row {
@@ -1666,6 +1707,11 @@ button:not(:disabled):active {
     gap: 8px;
     padding: 10px;
     border-radius: 16px;
+  }
+
+  .workout-progress {
+    grid-column: 1 / -1;
+    height: 8px;
   }
 
   .workout-head > div {
@@ -2026,7 +2072,7 @@ button:not(:disabled):active {
   }
 
   .routine-row {
-    grid-template-columns: minmax(0, 1fr) 62px 38px;
+    grid-template-columns: minmax(0, 1fr) 58px 34px 38px;
   }
 
   .set-line {

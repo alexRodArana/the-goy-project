@@ -12,6 +12,8 @@ import type {
 import {
   Activity,
   ArrowLeft,
+  ArrowDown,
+  ArrowUp,
   BarChart3,
   CalendarDays,
   Camera,
@@ -1098,6 +1100,7 @@ function TrainingView({
       (total, exercise) => total + exercise.sets.filter((set) => set.completed).length,
       0,
     )
+    const progressPercent = totalSets ? Math.round((completedSets / totalSets) * 100) : 0
 
     return (
       <section className="focus-shell enter">
@@ -1115,6 +1118,16 @@ function TrainingView({
           <button className="finish-button" type="button" onClick={finishWorkout}>
             Terminar
           </button>
+          <div
+            aria-label={`Progreso ${progressPercent}%`}
+            aria-valuemax={100}
+            aria-valuemin={0}
+            aria-valuenow={progressPercent}
+            className="workout-progress"
+            role="progressbar"
+          >
+            <span style={{ width: `${progressPercent}%` }} />
+          </div>
         </div>
 
         <div className="exercise-session">
@@ -1317,6 +1330,50 @@ function TrainingView({
                     }))
                   }
                 />
+                <div className="order-controls">
+                  <button
+                    aria-label="Subir ejercicio"
+                    className="icon-button flat"
+                    data-tooltip="Subir"
+                    disabled={index === 0}
+                    type="button"
+                    onClick={() => {
+                      vibrate(8)
+                      setRoutineDraft((draft) => {
+                        const exercises = [...draft.exercises]
+                        const previous = exercises[index - 1]
+                        if (!previous) {
+                          return draft
+                        }
+                        ;[exercises[index - 1], exercises[index]] = [exercises[index], exercises[index - 1]]
+                        return { ...draft, exercises }
+                      })
+                    }}
+                  >
+                    <ArrowUp size={15} />
+                  </button>
+                  <button
+                    aria-label="Bajar ejercicio"
+                    className="icon-button flat"
+                    data-tooltip="Bajar"
+                    disabled={index === routineDraft.exercises.length - 1}
+                    type="button"
+                    onClick={() => {
+                      vibrate(8)
+                      setRoutineDraft((draft) => {
+                        const exercises = [...draft.exercises]
+                        const next = exercises[index + 1]
+                        if (!next) {
+                          return draft
+                        }
+                        ;[exercises[index], exercises[index + 1]] = [exercises[index + 1], exercises[index]]
+                        return { ...draft, exercises }
+                      })
+                    }}
+                  >
+                    <ArrowDown size={15} />
+                  </button>
+                </div>
                 <button
                   aria-label="Eliminar ejercicio"
                   className="icon-button flat"
