@@ -3,6 +3,7 @@ import type {
   CSSProperties,
   ChangeEvent,
   Dispatch,
+  FocusEvent as ReactFocusEvent,
   FormEvent,
   MouseEvent as ReactMouseEvent,
   PointerEvent as ReactPointerEvent,
@@ -140,6 +141,25 @@ const formatDuration = (seconds: number) => {
 
   return [hours, minutes, rest].map((part) => String(part).padStart(2, '0')).join(':')
 }
+
+const normalizeName = (value: string) => value.trim().toLocaleLowerCase('es-MX')
+
+const selectInputValue = (event: ReactFocusEvent<HTMLInputElement>) => {
+  const input = event.currentTarget
+  window.requestAnimationFrame(() => {
+    try {
+      input.select()
+    } catch {
+      // Some mobile browsers do not expose text selection for numeric inputs.
+    }
+  })
+}
+
+const numericInputProps = {
+  autoComplete: 'off',
+  enterKeyHint: 'done',
+  onFocus: selectInputValue,
+} as const
 
 const navItems: { key: TabKey; label: string; icon: LucideIcon }[] = [
   { key: 'training', label: 'Training', icon: Dumbbell },
@@ -592,6 +612,18 @@ function App() {
   const elapsedSeconds = state.activeWorkout
     ? Math.floor((now - new Date(state.activeWorkout.startedAt).getTime()) / 1000)
     : 0
+  const activeRoutineId = state.activeWorkout?.routineId
+  const activeRoutineName = state.activeWorkout?.routineName
+  const previousWorkoutForActive = useMemo(() => {
+    if (!activeRoutineName) {
+      return undefined
+    }
+
+    const normalizedRoutineName = normalizeName(activeRoutineName)
+    return sortedWorkouts.find(
+      (workout) => workout.routineId === activeRoutineId || normalizeName(workout.routineName) === normalizedRoutineName,
+    )
+  }, [activeRoutineId, activeRoutineName, sortedWorkouts])
   const isTrainingFocus = activeTab === 'training' && Boolean(state.activeWorkout || trainingMode !== 'home')
   const mainClassName = ['main', `main-${activeTab}`, isTrainingFocus ? 'main-focus' : ''].filter(Boolean).join(' ')
 
@@ -989,6 +1021,7 @@ function App() {
             elapsedSeconds={elapsedSeconds}
             finishWorkout={finishWorkout}
             mode={trainingMode}
+            previousWorkout={previousWorkoutForActive}
             resetRoutineDraft={resetRoutineDraft}
             routineDraft={routineDraft}
             routines={state.routines}
@@ -1054,6 +1087,7 @@ function TrainingView({
   elapsedSeconds,
   finishWorkout,
   mode,
+  previousWorkout,
   resetRoutineDraft,
   routineDraft,
   routines,
@@ -1075,6 +1109,7 @@ function TrainingView({
   elapsedSeconds: number
   finishWorkout: () => void
   mode: RoutineMode
+  previousWorkout?: Workout
   resetRoutineDraft: () => void
   routineDraft: RoutineDraft
   routines: Routine[]
@@ -1094,6 +1129,14 @@ function TrainingView({
     value: number | boolean | null,
   ) => void
 }) {
+  const previousExercisesByName = useMemo(() => {
+    const lookup = new Map<string, Workout['exercises'][number]>()
+    previousWorkout?.exercises.forEach((exercise) => {
+      lookup.set(normalizeName(exercise.name), exercise)
+    })
+    return lookup
+  }, [previousWorkout])
+
   if (activeWorkout) {
     const totalSets = activeWorkout.exercises.reduce((total, exercise) => total + exercise.sets.length, 0)
     const completedSets = activeWorkout.exercises.reduce(
@@ -1131,66 +1174,84 @@ function TrainingView({
         </div>
 
         <div className="exercise-session">
-          {activeWorkout.exercises.map((exercise, index) => (
-            <article className="exercise-block" key={exercise.id}>
-              <div className="exercise-title">
-                <span>{String(index + 1).padStart(2, '0')}</span>
-                <h2>{exercise.name}</h2>
-              </div>
-              <div className="set-table">
-                {exercise.sets.map((set) => (
-                  <div className={set.completed ? 'set-line complete' : 'set-line'} key={set.id}>
-                    <button
-                      aria-label={set.completed ? 'Marcar serie pendiente' : 'Completar serie'}
-                      className="complete-toggle"
-                      data-tooltip="Completar"
-                      type="button"
-                      onClick={() => {
-                        vibrate(8)
-                        updateTrainingSet(exercise.id, set.id, 'completed', !set.completed)
-                      }}
-                    >
-                      {set.completed ? <CheckCircle2 size={18} /> : <Check size={18} />}
-                    </button>
-                    <strong>{set.setNumber}</strong>
-                    <input
-                      aria-label="Peso"
-                      inputMode="decimal"
-                      min="0"
-                      placeholder="kg"
-                      step="0.5"
-                      type="number"
-                      value={set.weight ?? ''}
-                      onChange={(event) =>
-                        updateTrainingSet(
-                          exercise.id,
-                          set.id,
-                          'weight',
-                          event.target.value === '' ? null : Number(event.target.value),
-                        )
-                      }
-                    />
-                    <input
-                      aria-label="Reps"
-                      inputMode="numeric"
-                      min="0"
-                      placeholder="reps"
-                      type="number"
-                      value={set.reps ?? ''}
-                      onChange={(event) =>
-                        updateTrainingSet(
-                          exercise.id,
-                          set.id,
-                          'reps',
-                          event.target.value === '' ? null : Number(event.target.value),
-                        )
-                      }
-                    />
-                  </div>
-                ))}
-              </div>
-            </article>
-          ))}
+          {activeWorkout.exercises.map((exercise, index) => {
+            const normalizedExerciseName = normalizeName(exercise.name)
+            const previousExerciseAtIndex = previousWorkout?.exercises[index]
+            const previousExercise =
+              previousExerciseAtIndex && normalizeName(previousExerciseAtIndex.name) === normalizedExerciseName
+                ? previousExerciseAtIndex
+                : previousExercisesByName.get(normalizedExerciseName)
+
+            return (
+              <article className="exercise-block" key={exercise.id}>
+                <div className="exercise-title">
+                  <span>{String(index + 1).padStart(2, '0')}</span>
+                  <h2>{exercise.name}</h2>
+                </div>
+                <div className="set-table">
+                  {exercise.sets.map((set) => {
+                    const previousSet = previousExercise?.sets.find((item) => item.setNumber === set.setNumber)
+                    const weightPlaceholder =
+                      previousSet?.weight === null || previousSet?.weight === undefined ? 'kg' : formatNumber(previousSet.weight)
+                    const repsPlaceholder = previousSet?.reps === null || previousSet?.reps === undefined ? 'reps' : String(previousSet.reps)
+
+                    return (
+                      <div className={set.completed ? 'set-line complete' : 'set-line'} key={set.id}>
+                        <button
+                          aria-label={set.completed ? 'Marcar serie pendiente' : 'Completar serie'}
+                          className="complete-toggle"
+                          data-tooltip="Completar"
+                          type="button"
+                          onClick={() => {
+                            vibrate(8)
+                            updateTrainingSet(exercise.id, set.id, 'completed', !set.completed)
+                          }}
+                        >
+                          {set.completed ? <CheckCircle2 size={18} /> : <Check size={18} />}
+                        </button>
+                        <strong>{set.setNumber}</strong>
+                        <input
+                          {...numericInputProps}
+                          aria-label="Peso"
+                          inputMode="decimal"
+                          min="0"
+                          placeholder={weightPlaceholder}
+                          step="0.5"
+                          type="number"
+                          value={set.weight ?? ''}
+                          onChange={(event) =>
+                            updateTrainingSet(
+                              exercise.id,
+                              set.id,
+                              'weight',
+                              event.target.value === '' ? null : Number(event.target.value),
+                            )
+                          }
+                        />
+                        <input
+                          {...numericInputProps}
+                          aria-label="Reps"
+                          inputMode="numeric"
+                          min="0"
+                          placeholder={repsPlaceholder}
+                          type="number"
+                          value={set.reps ?? ''}
+                          onChange={(event) =>
+                            updateTrainingSet(
+                              exercise.id,
+                              set.id,
+                              'reps',
+                              event.target.value === '' ? null : Number(event.target.value),
+                            )
+                          }
+                        />
+                      </div>
+                    )
+                  })}
+                </div>
+              </article>
+            )
+          })}
 
           <article className={activeWorkout.cardio.completed ? 'cardio-block complete' : 'cardio-block'}>
             <div className="exercise-title">
@@ -1202,6 +1263,7 @@ function TrainingView({
             <div className="cardio-grid">
               <Field label="Inclinacion">
                 <input
+                  {...numericInputProps}
                   aria-label="Inclinacion"
                   inputMode="decimal"
                   min="0"
@@ -1216,6 +1278,7 @@ function TrainingView({
               </Field>
               <Field label="Velocidad">
                 <input
+                  {...numericInputProps}
                   aria-label="Velocidad"
                   inputMode="decimal"
                   min="0"
@@ -1230,6 +1293,7 @@ function TrainingView({
               </Field>
               <Field label="Tiempo">
                 <input
+                  {...numericInputProps}
                   aria-label="Tiempo de cardio"
                   inputMode="numeric"
                   min="0"
@@ -1317,7 +1381,9 @@ function TrainingView({
                   }
                 />
                 <input
+                  {...numericInputProps}
                   aria-label="Series"
+                  inputMode="numeric"
                   min="1"
                   type="number"
                   value={exercise.sets}
@@ -1825,6 +1891,8 @@ function WorkoutEditor({
         </Field>
         <Field label="Duracion min">
           <input
+            {...numericInputProps}
+            inputMode="numeric"
             min="1"
             required
             type="number"
@@ -1876,6 +1944,7 @@ function WorkoutEditor({
                   </button>
                   <strong>{set.setNumber}</strong>
                   <input
+                    {...numericInputProps}
                     aria-label="Peso"
                     inputMode="decimal"
                     min="0"
@@ -1886,6 +1955,7 @@ function WorkoutEditor({
                     onChange={(event) => updateSet(exercise.id, set.id, { weight: event.target.value === '' ? null : Number(event.target.value) })}
                   />
                   <input
+                    {...numericInputProps}
                     aria-label="Reps"
                     inputMode="numeric"
                     min="0"
@@ -1927,6 +1997,7 @@ function WorkoutEditor({
         <div className="cardio-grid">
           <Field label="Inclinacion">
             <input
+              {...numericInputProps}
               inputMode="decimal"
               min="0"
               step="0.5"
@@ -1942,6 +2013,7 @@ function WorkoutEditor({
           </Field>
           <Field label="Velocidad">
             <input
+              {...numericInputProps}
               inputMode="decimal"
               min="0"
               step="0.1"
@@ -1957,6 +2029,7 @@ function WorkoutEditor({
           </Field>
           <Field label="Tiempo">
             <input
+              {...numericInputProps}
               inputMode="numeric"
               min="0"
               step="1"
@@ -2044,7 +2117,9 @@ function TimelineView({
               </label>
               <Field label="Peso">
                 <input
+                  {...numericInputProps}
                   autoFocus
+                  inputMode="decimal"
                   min="0"
                   required
                   step="0.1"
@@ -2213,6 +2288,8 @@ function CheckInEditor({
       </Field>
       <Field label="Peso">
         <input
+          {...numericInputProps}
+          inputMode="decimal"
           min="0"
           required
           step="0.1"
