@@ -20,6 +20,8 @@ import {
   Camera,
   Check,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Cloud,
   Dumbbell,
   Gauge,
@@ -27,6 +29,7 @@ import {
   LayoutDashboard,
   Mail,
   Moon,
+  Palette,
   Pencil,
   Play,
   Plus,
@@ -67,6 +70,21 @@ import type {
 
 type RoutineMode = 'home' | 'create' | 'edit'
 
+type AccentColor = 'green' | 'blue' | 'purple' | 'orange' | 'rose'
+
+type AccentOption = {
+  key: AccentColor
+  label: string
+  color: string
+}
+
+type CalendarDay = {
+  date: string
+  dayNumber: number
+  isCurrentMonth: boolean
+  workouts: Workout[]
+}
+
 type RoutineDraft = {
   name: string
   days: string
@@ -101,11 +119,16 @@ type CheckInDraft = {
   photo: string
 }
 
-const todayIso = () => new Date().toISOString().slice(0, 10)
+const toDateKey = (date: Date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+
+const todayIso = () => toDateKey(new Date())
 
 const createId = (prefix: string) => `${prefix}-${crypto.randomUUID()}`
 
 const toLocalDate = (value: string) => new Date(`${value}T12:00:00`)
+
+const toMonthKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
 
 const formatDate = (value: string) =>
   new Intl.DateTimeFormat('es-MX', {
@@ -144,6 +167,16 @@ const formatDuration = (seconds: number) => {
 
 const normalizeName = (value: string) => value.trim().toLocaleLowerCase('es-MX')
 
+const addMonths = (monthKey: string, offset: number) => {
+  const [year, month] = monthKey.split('-').map(Number)
+  const date = new Date(year, month - 1 + offset, 1)
+  return toMonthKey(date)
+}
+
+const formatMonthKey = (monthKey: string) => formatMonth(`${monthKey}-01`)
+
+const wait = (milliseconds: number) => new Promise((resolve) => window.setTimeout(resolve, milliseconds))
+
 const selectInputValue = (event: ReactFocusEvent<HTMLInputElement>) => {
   const input = event.currentTarget
   window.requestAnimationFrame(() => {
@@ -170,6 +203,13 @@ const navItems: { key: TabKey; label: string; icon: LucideIcon }[] = [
 
 const exerciseColors = ['#2563eb', '#0f9f6e', '#d97706', '#7c3aed', '#dc2626', '#0891b2', '#be185d', '#4f46e5']
 const brandMarkSrc = `${import.meta.env.BASE_URL}app-icon-192.png`
+const accentOptions: AccentOption[] = [
+  { key: 'green', label: 'Verde', color: '#39b980' },
+  { key: 'blue', label: 'Azul', color: '#2563eb' },
+  { key: 'purple', label: 'Morado', color: '#7c3aed' },
+  { key: 'orange', label: 'Naranja', color: '#d97706' },
+  { key: 'rose', label: 'Rosa', color: '#be185d' },
+]
 const trainingPhrases = [
   'Goy mode off, disciplina Judia on.',
   'Del Goy al modo Kosher, una serie a la vez.',
@@ -409,6 +449,9 @@ function useSwipeAction({
 function App() {
   const [state, setState] = useState<AppState>(initialState)
   const stateRef = useRef(state)
+  const authHydrationRef = useRef(0)
+  const initialAuthHandledRef = useRef(false)
+  const isHydratingRef = useRef(false)
   const [isLoaded, setIsLoaded] = useState(false)
   const [session, setSession] = useState<SyncSession | null>(null)
   const [syncEmail, setSyncEmail] = useState('')
@@ -425,6 +468,11 @@ function App() {
     }
     return 'dark'
   })
+  const [accent, setAccent] = useState<AccentColor>(() => {
+    const storedAccent = localStorage.getItem('goy-accent')
+    return accentOptions.some((option) => option.key === storedAccent) ? (storedAccent as AccentColor) : 'green'
+  })
+  const [isAccentMenuOpen, setIsAccentMenuOpen] = useState(false)
   const [selectedRoutineId, setSelectedRoutineId] = useState(initialState.routines[0]?.id ?? '')
   const [trainingMode, setTrainingMode] = useState<RoutineMode>('home')
   const [editingRoutineId, setEditingRoutineId] = useState('')
@@ -453,55 +501,90 @@ function App() {
     }
   }, [])
 
-  const applyRemoteState = useCallback(async (userId: string, localState: AppState) => {
-    const remoteState = await loadRemoteState(userId)
-    const shouldBootstrapRemote = !hasUserData(remoteState) && hasUserData(localState)
-    const nextState = shouldBootstrapRemote ? localState : remoteState
-
-    applyLoadedState(nextState)
-
-    if (shouldBootstrapRemote) {
-      await saveRemoteState(userId, nextState)
+  const loadRemoteStateWithRetry = useCallback(async (userId: string) => {
+    try {
+      return await loadRemoteState(userId)
+    } catch (error) {
+      await wait(500)
+      try {
+        return await loadRemoteState(userId)
+      } catch {
+        throw error
+      }
     }
-  }, [applyLoadedState])
+  }, [])
+
+  const hydrateSessionState = useCallback(async (nextSession: SyncSession, localState: AppState) => {
+    const token = authHydrationRef.current + 1
+    authHydrationRef.current = token
+    isHydratingRef.current = true
+    setSyncStatus('loading')
+
+    try {
+      const remoteState = await loadRemoteStateWithRetry(nextSession.user.id)
+      if (authHydrationRef.current !== token) {
+        return
+      }
+
+      const shouldBootstrapRemote = !hasUserData(remoteState) && hasUserData(localState)
+      const nextState = shouldBootstrapRemote ? localState : remoteState
+
+      applyLoadedState(nextState)
+      setSession(nextSession)
+      setSyncStatus('synced')
+      setSyncMessage('')
+      try {
+        await saveLocalState(nextState)
+      } catch (error) {
+        console.error('Could not cache remote state locally', error)
+      }
+
+      if (shouldBootstrapRemote) {
+        await saveRemoteState(nextSession.user.id, nextState)
+      }
+    } finally {
+      if (authHydrationRef.current === token) {
+        isHydratingRef.current = false
+      }
+    }
+
+  }, [applyLoadedState, loadRemoteStateWithRetry])
 
   useEffect(() => {
     let mounted = true
 
     const loadInitialState = async () => {
       try {
+        const localState = await loadLocalState()
+
         if (isSupabaseConfigured) {
           const currentSession = await getSession()
           if (!mounted) {
             return
           }
 
-          setSession(currentSession)
-
           if (currentSession) {
-            const localState = await loadLocalState()
-            if (!mounted) {
-              return
-            }
-            await applyRemoteState(currentSession.user.id, localState)
-            setSyncStatus('synced')
+            await hydrateSessionState(currentSession, localState)
           } else {
-            applyLoadedState(await loadLocalState())
+            setSession(null)
+            applyLoadedState(localState)
             setSyncStatus('local')
           }
         } else {
-          applyLoadedState(await loadLocalState())
+          applyLoadedState(localState)
           setSyncStatus('local')
         }
       } catch (error) {
         console.error('Could not load persisted state', error)
         if (mounted) {
-          applyLoadedState(await loadLocalState())
+          const fallbackState = await loadLocalState()
+          applyLoadedState(fallbackState)
           setSyncStatus('error')
           setSyncMessage('No se pudo cargar Supabase.')
         }
       } finally {
         if (mounted) {
+          initialAuthHandledRef.current = true
           setIsLoaded(true)
         }
       }
@@ -510,8 +593,14 @@ function App() {
     loadInitialState()
 
     const unsubscribe = onAuthChange(async (nextSession) => {
-      setSession(nextSession)
+      if (!initialAuthHandledRef.current) {
+        return
+      }
+
       if (!nextSession) {
+        authHydrationRef.current += 1
+        isHydratingRef.current = false
+        setSession(null)
         setSyncStatus('local')
         return
       }
@@ -521,12 +610,11 @@ function App() {
         if (!mounted) {
           return
         }
-        await applyRemoteState(nextSession.user.id, localState)
-        setSyncStatus('synced')
-        setSyncMessage('')
+        await hydrateSessionState(nextSession, localState)
         setSyncPassword('')
       } catch (error) {
         console.error('Could not load remote state', error)
+        setSession(nextSession)
         setSyncStatus('error')
         setSyncMessage('No se pudo sincronizar.')
       }
@@ -536,7 +624,7 @@ function App() {
       mounted = false
       unsubscribe()
     }
-  }, [applyLoadedState, applyRemoteState])
+  }, [applyLoadedState, hydrateSessionState])
 
   useEffect(() => {
     stateRef.current = state
@@ -548,13 +636,18 @@ function App() {
   }, [theme])
 
   useEffect(() => {
+    document.documentElement.dataset.accent = accent
+    localStorage.setItem('goy-accent', accent)
+  }, [accent])
+
+  useEffect(() => {
     const syncHash = () => setActiveTabState(tabFromHash())
     window.addEventListener('hashchange', syncHash)
     return () => window.removeEventListener('hashchange', syncHash)
   }, [])
 
   useEffect(() => {
-    if (!isLoaded) {
+    if (!isLoaded || isHydratingRef.current) {
       return
     }
 
@@ -626,6 +719,7 @@ function App() {
   }, [activeRoutineId, activeRoutineName, sortedWorkouts])
   const isTrainingFocus = activeTab === 'training' && Boolean(state.activeWorkout || trainingMode !== 'home')
   const mainClassName = ['main', `main-${activeTab}`, isTrainingFocus ? 'main-focus' : ''].filter(Boolean).join(' ')
+  const currentAccent = accentOptions.find((option) => option.key === accent) ?? accentOptions[0]
 
   const setActiveTab = (tab: TabKey) => {
     if (tab !== activeTab) {
@@ -702,6 +796,8 @@ function App() {
   }
 
   const disconnectSync = async () => {
+    authHydrationRef.current += 1
+    isHydratingRef.current = false
     await signOut()
     setSession(null)
     setSyncStatus('local')
@@ -965,6 +1061,44 @@ function App() {
               {syncStatus === 'error' ? <Cloud size={17} /> : <CheckCircle2 size={17} />}
             </button>
           )}
+          <div className="accent-picker">
+            <button
+              aria-expanded={isAccentMenuOpen}
+              aria-label="Elegir color de acento"
+              className="icon-button accent-button"
+              data-tooltip={currentAccent.label}
+              type="button"
+              onClick={() => {
+                vibrate(8)
+                setIsAccentMenuOpen((current) => !current)
+              }}
+            >
+              <Palette size={17} />
+              <span className="accent-dot" style={{ '--accent-dot': currentAccent.color } as CSSProperties} />
+            </button>
+            {isAccentMenuOpen && (
+              <div className="accent-menu" role="menu">
+                {accentOptions.map((option) => (
+                  <button
+                    aria-checked={option.key === accent}
+                    aria-label={`Color ${option.label}`}
+                    className={option.key === accent ? 'accent-swatch active' : 'accent-swatch'}
+                    key={option.key}
+                    role="menuitemradio"
+                    style={{ '--accent-dot': option.color } as CSSProperties}
+                    type="button"
+                    onClick={() => {
+                      vibrate(10)
+                      setAccent(option.key)
+                      setIsAccentMenuOpen(false)
+                    }}
+                  >
+                    <span />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <button
             aria-label={theme === 'dark' ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'}
             className="icon-button"
@@ -972,6 +1106,7 @@ function App() {
             type="button"
             onClick={() => {
               vibrate(8)
+              setIsAccentMenuOpen(false)
               setTheme((current) => (current === 'dark' ? 'light' : 'dark'))
             }}
           >
@@ -1635,10 +1770,49 @@ function HistoryView({
   updateWorkout: (workout: Workout) => void
   workouts: Workout[]
 }) {
-  const groupedWorkouts = groupWorkoutsByMonth(workouts)
+  const latestWorkoutMonth = workouts[0]?.date.slice(0, 7) ?? todayIso().slice(0, 7)
+  const [visibleMonth, setVisibleMonth] = useState(latestWorkoutMonth)
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState(workouts[0]?.date ?? todayIso())
+  const calendarWasNavigatedRef = useRef(false)
+  const groupedWorkouts = useMemo(() => groupWorkoutsByMonth(workouts), [workouts])
+  const calendarDays = useMemo(() => buildCalendarDays(visibleMonth, workouts), [visibleMonth, workouts])
+  const monthWorkouts = useMemo(() => workouts.filter((workout) => workout.date.startsWith(visibleMonth)), [visibleMonth, workouts])
+  const effectiveSelectedDate = selectedCalendarDate.startsWith(visibleMonth)
+    ? selectedCalendarDate
+    : monthWorkouts[0]?.date ?? `${visibleMonth}-01`
+  const selectedDayWorkouts = useMemo(
+    () => workouts.filter((workout) => workout.date === effectiveSelectedDate),
+    [effectiveSelectedDate, workouts],
+  )
+
+  useEffect(() => {
+    if (!workouts.length || calendarWasNavigatedRef.current) {
+      return
+    }
+
+    setVisibleMonth(latestWorkoutMonth)
+    setSelectedCalendarDate(workouts[0].date)
+  }, [latestWorkoutMonth, workouts])
+
+  const changeCalendarMonth = (offset: number) => {
+    vibrate(8)
+    calendarWasNavigatedRef.current = true
+    const nextMonth = addMonths(visibleMonth, offset)
+    setVisibleMonth(nextMonth)
+    setSelectedCalendarDate(workouts.find((workout) => workout.date.startsWith(nextMonth))?.date ?? `${nextMonth}-01`)
+  }
 
   return (
     <section className={workouts.length ? 'history-feed enter' : 'history-feed history-empty enter'}>
+      <HistoryCalendar
+        days={calendarDays}
+        monthLabel={formatMonthKey(visibleMonth)}
+        onChangeMonth={changeCalendarMonth}
+        onSelectDate={setSelectedCalendarDate}
+        selectedDate={effectiveSelectedDate}
+        selectedWorkouts={selectedDayWorkouts}
+      />
+
       {workouts.length ? (
         groupedWorkouts.map(({ month, items }) => (
           <section className="history-month" key={month}>
@@ -1668,6 +1842,91 @@ function HistoryView({
           <EmptyState icon={History} label="Sin entrenamientos" />
         </section>
       )}
+    </section>
+  )
+}
+
+function HistoryCalendar({
+  days,
+  monthLabel,
+  onChangeMonth,
+  onSelectDate,
+  selectedDate,
+  selectedWorkouts,
+}: {
+  days: CalendarDay[]
+  monthLabel: string
+  onChangeMonth: (offset: number) => void
+  onSelectDate: (date: string) => void
+  selectedDate: string
+  selectedWorkouts: Workout[]
+}) {
+  const selectedDateLabel = formatDate(selectedDate)
+
+  return (
+    <section className="surface history-calendar">
+      <div className="calendar-head">
+        <button aria-label="Mes anterior" className="icon-button flat" type="button" onClick={() => onChangeMonth(-1)}>
+          <ChevronLeft size={18} />
+        </button>
+        <strong>{monthLabel}</strong>
+        <button aria-label="Mes siguiente" className="icon-button flat" type="button" onClick={() => onChangeMonth(1)}>
+          <ChevronRight size={18} />
+        </button>
+      </div>
+
+      <div className="calendar-weekdays" aria-hidden="true">
+        {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((day, index) => (
+          <span key={`${day}-${index}`}>{day}</span>
+        ))}
+      </div>
+
+      <div className="calendar-grid">
+        {days.map((day) => {
+          const hasWorkout = day.workouts.length > 0
+          const isSelected = day.date === selectedDate
+          const className = [
+            'calendar-day',
+            day.isCurrentMonth ? '' : 'muted',
+            hasWorkout ? 'trained' : '',
+            isSelected ? 'selected' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')
+
+          return (
+            <button
+              aria-label={`${formatDate(day.date)}${hasWorkout ? `, ${day.workouts.length} entrenamiento` : ', sin entrenamiento'}`}
+              className={className}
+              key={day.date}
+              type="button"
+              onClick={() => {
+                vibrate(hasWorkout ? 10 : 4)
+                onSelectDate(day.date)
+              }}
+            >
+              <span>{day.dayNumber}</span>
+              {hasWorkout && <i>{day.workouts.length}</i>}
+            </button>
+          )
+        })}
+      </div>
+
+      <div className="calendar-summary">
+        <span>{selectedDateLabel}</span>
+        {selectedWorkouts.length ? (
+          <div>
+            {selectedWorkouts.map((workout) => (
+              <p key={workout.id}>
+                <strong>{workout.routineName}</strong>
+                <small>{formatDuration(workout.durationSeconds)}</small>
+              </p>
+            ))}
+          </div>
+        ) : (
+          <strong>Sin entrenamiento</strong>
+        )}
+      </div>
     </section>
   )
 }
@@ -2556,6 +2815,29 @@ function groupWorkoutsByMonth(workouts: Workout[]) {
   })
 
   return [...grouped.entries()].map(([month, items]) => ({ month, items }))
+}
+
+function buildCalendarDays(monthKey: string, workouts: Workout[]): CalendarDay[] {
+  const [year, month] = monthKey.split('-').map(Number)
+  const firstDay = new Date(year, month - 1, 1)
+  const startOffset = (firstDay.getDay() + 6) % 7
+  const workoutsByDate = new Map<string, Workout[]>()
+
+  workouts.forEach((workout) => {
+    workoutsByDate.set(workout.date, [...(workoutsByDate.get(workout.date) ?? []), workout])
+  })
+
+  return Array.from({ length: 42 }, (_, index) => {
+    const date = new Date(year, month - 1, index - startOffset + 1)
+    const dateKey = toDateKey(date)
+
+    return {
+      date: dateKey,
+      dayNumber: date.getDate(),
+      isCurrentMonth: date.getMonth() === month - 1,
+      workouts: workoutsByDate.get(dateKey) ?? [],
+    }
+  })
 }
 
 function buildExerciseSeries(workouts: Workout[]) {
