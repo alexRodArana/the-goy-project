@@ -313,8 +313,6 @@ html:not([data-theme='dark']) .brand-mark img {
   gap: 10px;
 }
 
-.history-card span,
-.history-card small,
 .detail-head span {
   color: var(--muted);
   font-size: 12px;
@@ -692,25 +690,6 @@ html:not([data-theme='dark']) .brand-mark img {
     0 0 0 3px var(--focus);
 }
 
-.calendar-day i {
-  position: absolute;
-  top: 5px;
-  right: 5px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 14px;
-  height: 14px;
-  padding: 0 4px;
-  color: #ffffff;
-  font-size: 9px;
-  font-style: normal;
-  font-weight: 900;
-  line-height: 1;
-  background: var(--brand);
-  border-radius: 999px;
-}
-
 .calendar-summary {
   display: grid;
   gap: 8px;
@@ -732,102 +711,34 @@ html:not([data-theme='dark']) .brand-mark img {
   font-size: 14px;
 }
 
-.calendar-summary div {
+.calendar-workouts {
   display: grid;
   gap: 6px;
 }
 
-.calendar-summary p {
+.calendar-workout {
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.calendar-workout.expanded {
+  border-color: var(--brand-line);
+  box-shadow: inset 3px 0 0 var(--brand);
+}
+
+.calendar-workout > button {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
-}
-
-.calendar-summary p strong {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--ink);
-  font-size: 14px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.calendar-summary p small {
-  color: var(--brand-ink);
-  font-size: 12px;
-  font-weight: 850;
-  font-variant-numeric: tabular-nums;
-}
-
-.history-month {
-  display: grid;
-  gap: 10px;
-}
-
-.history-month h2 {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 900;
-}
-
-.history-cards {
-  display: grid;
-  gap: 8px;
-}
-
-.history-card {
-  overflow: hidden;
-  touch-action: pan-y;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  box-shadow: var(--shadow);
-  animation: rise 220ms ease both;
-  transition:
-    border-color 180ms ease,
-    box-shadow 180ms ease,
-    transform 180ms ease;
-}
-
-.history-card.dragging,
-.timeline-swipe-card.dragging {
-  transition: none;
-}
-
-.history-card:hover {
-  transform: translateY(-1px);
-}
-
-.history-card[data-swipe='edit'] {
-  border-color: var(--brand-line);
-  box-shadow:
-    inset 4px 0 0 var(--brand),
-    var(--shadow);
-}
-
-.history-card[data-swipe='delete'] {
-  border-color: color-mix(in srgb, var(--danger) 48%, var(--line));
-  box-shadow:
-    inset -4px 0 0 var(--danger),
-    var(--shadow);
-}
-
-.history-card.selected {
-  border-color: var(--brand-line);
-  box-shadow:
-    inset 3px 0 0 var(--brand),
-    var(--shadow);
-}
-
-.history-card > button {
-  display: grid;
-  grid-template-columns: 70px minmax(0, 1fr) auto;
-  gap: 10px;
-  align-items: center;
   width: 100%;
-  min-height: 68px;
-  padding: 12px 14px;
+  min-height: 46px;
+  padding: 0 10px;
   color: var(--ink);
   font: inherit;
   text-align: left;
@@ -836,37 +747,28 @@ html:not([data-theme='dark']) .brand-mark img {
   cursor: pointer;
 }
 
-.history-card > button > span {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 40px;
-  color: var(--brand-ink);
-  line-height: 1.1;
-  text-align: center;
-  background: var(--brand-soft);
-  border: 1px solid var(--brand-line);
-  border-radius: 8px;
-}
-
-.history-card strong {
+.calendar-workout > button strong {
   min-width: 0;
   overflow: hidden;
   color: var(--ink);
-  font-size: 16px;
+  font-size: 14px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.history-card small {
-  justify-self: end;
+.calendar-workout > button small {
   color: var(--brand-ink);
-  font-size: 13px;
+  font-size: 12px;
+  font-weight: 850;
   font-variant-numeric: tabular-nums;
 }
 
+.timeline-swipe-card.dragging {
+  transition: none;
+}
+
 .history-expanded {
-  margin: 0 12px 12px;
+  margin: 0 10px 10px;
   padding-top: 12px;
   border-top: 1px solid var(--line);
   animation: expandIn 180ms ease both;
@@ -1184,172 +1086,6 @@ html:not([data-theme='dark']) .brand-mark img {
   cursor: pointer;
 }
 
-.page-stack {
-  display: grid;
-  gap: 18px;
-}
-
-.metric-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.metric-card {
-  display: grid;
-  grid-template-columns: 38px minmax(0, 1fr);
-  grid-template-areas:
-    'icon label'
-    'icon value';
-  align-items: center;
-  gap: 2px 12px;
-  min-height: 86px;
-  padding: 16px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  box-shadow: var(--shadow);
-}
-
-.metric-card svg {
-  grid-area: icon;
-  width: 38px;
-  height: 38px;
-  padding: 9px;
-  color: var(--brand-ink);
-  background: var(--brand-soft);
-  border: 1px solid var(--brand-line);
-  border-radius: 8px;
-}
-
-.metric-card span {
-  grid-area: label;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 760;
-}
-
-.metric-card strong {
-  grid-area: value;
-  color: var(--ink);
-  font-size: 23px;
-  line-height: 1.1;
-}
-
-.chart-card {
-  overflow: hidden;
-}
-
-.section-title {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 18px 18px 0;
-}
-
-.section-title > span {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--ink);
-  font-size: 15px;
-  font-weight: 850;
-}
-
-.chart-wrap {
-  min-height: 320px;
-  padding: 10px 18px 18px;
-}
-
-.chart-wrap svg {
-  display: block;
-  width: 100%;
-  height: 300px;
-}
-
-.chart-wrap.multi svg {
-  height: 340px;
-}
-
-.chart-grid-line {
-  stroke: var(--grid);
-  stroke-width: 1;
-}
-
-.chart-line {
-  fill: none;
-  stroke: var(--chart-a);
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 4;
-}
-
-.chart-area {
-  fill: var(--chart-fill);
-}
-
-.chart-wrap circle {
-  fill: var(--surface);
-  stroke: var(--chart-a);
-  stroke-width: 3;
-}
-
-.chart-wrap text {
-  fill: var(--muted);
-  font-size: 11px;
-  text-anchor: middle;
-}
-
-.toggle-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 0 18px 18px;
-}
-
-.line-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  min-height: 34px;
-  padding: 0 10px;
-  color: var(--muted);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 820;
-  background: var(--field);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  cursor: pointer;
-  transition:
-    color 160ms ease,
-    border-color 160ms ease,
-    background 160ms ease,
-    transform 160ms ease;
-}
-
-.line-toggle:hover {
-  transform: translateY(-1px);
-}
-
-.line-toggle span {
-  width: 10px;
-  height: 10px;
-  background: var(--line-color);
-  border-radius: 999px;
-  opacity: 0.35;
-}
-
-.line-toggle.active {
-  color: var(--ink);
-  border-color: color-mix(in srgb, var(--line-color) 55%, var(--line));
-}
-
-.line-toggle.active span {
-  opacity: 1;
-}
-
 .field {
   display: grid;
   gap: 6px;
@@ -1495,16 +1231,6 @@ button:not(:disabled):active {
   transform: scale(0.98);
 }
 
-.empty-state {
-  display: grid;
-  justify-items: center;
-  align-content: center;
-  min-height: 260px;
-  gap: 10px;
-  color: var(--muted);
-  font-weight: 820;
-}
-
 [data-tooltip] {
   position: relative;
 }
@@ -1609,10 +1335,6 @@ button:not(:disabled):active {
     justify-content: center;
   }
 
-  .metric-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .history-detail {
     min-height: auto;
   }
@@ -1689,7 +1411,7 @@ button:not(:disabled):active {
     left: 12px;
     z-index: 40;
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 4px;
     grid-column: auto;
     grid-row: auto;
@@ -2084,42 +1806,10 @@ button:not(:disabled):active {
     border-radius: 11px;
   }
 
-  .calendar-day i {
-    top: 4px;
-    right: 4px;
-    min-width: 13px;
-    height: 13px;
-    font-size: 8px;
-  }
-
   .calendar-summary {
     min-height: 54px;
     padding: 9px;
     border-radius: 12px;
-  }
-
-  .history-month {
-    gap: 8px;
-  }
-
-  .history-card {
-    border-radius: 16px;
-  }
-
-  .history-card > button {
-    grid-template-columns: 62px minmax(0, 1fr) auto;
-    gap: 8px;
-    min-height: 64px;
-    padding: 10px;
-  }
-
-  .history-card > button > span {
-    min-height: 42px;
-    border-radius: 12px;
-  }
-
-  .history-card strong {
-    font-size: 15px;
   }
 
   .detail-head {
@@ -2251,89 +1941,6 @@ button:not(:disabled):active {
     border-radius: 10px;
   }
 
-  .page-stack {
-    gap: 12px;
-  }
-
-  .metric-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-  }
-
-  .metric-card {
-    grid-template-columns: 1fr;
-    grid-template-areas:
-      'icon'
-      'value'
-      'label';
-    justify-items: start;
-    gap: 5px;
-    min-height: 92px;
-    padding: 10px;
-    border-radius: 10px;
-  }
-
-  .metric-card svg {
-    width: 32px;
-    height: 32px;
-    padding: 7px;
-    border-radius: 9px;
-  }
-
-  .metric-card span {
-    font-size: 11px;
-    line-height: 1.15;
-  }
-
-  .metric-card strong {
-    font-size: 18px;
-  }
-
-  .section-title {
-    padding: 14px 14px 0;
-  }
-
-  .section-title > span {
-    font-size: 14px;
-  }
-
-  .chart-wrap {
-    min-height: 250px;
-    padding: 8px 12px 12px;
-    overflow: hidden;
-  }
-
-  .chart-wrap svg {
-    width: 100%;
-    max-width: 100%;
-    height: 240px;
-    margin: 0;
-  }
-
-  .chart-wrap.multi svg {
-    height: 270px;
-  }
-
-  .chart-wrap text {
-    font-size: 10px;
-  }
-
-  .toggle-grid {
-    flex-wrap: wrap;
-    gap: 7px;
-    padding: 0 14px 14px;
-    overflow: visible;
-  }
-
-  .line-toggle {
-    flex: 1 1 auto;
-    min-height: 32px;
-    padding: 0 9px;
-  }
-
-  .empty-state {
-    min-height: 220px;
-  }
 }
 
 @media (max-width: 360px) {
@@ -2376,20 +1983,4 @@ button:not(:disabled):active {
     width: min(230px, 74vw);
   }
 
-  .metric-grid {
-    gap: 6px;
-  }
-
-  .metric-card {
-    padding: 9px 8px;
-  }
-
-  .metric-card strong {
-    font-size: 16px;
-  }
-
-  .chart-wrap svg,
-  .chart-wrap.multi svg {
-    width: 100%;
-  }
 }

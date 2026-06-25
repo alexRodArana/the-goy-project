@@ -15,8 +15,6 @@ import {
   ArrowLeft,
   ArrowDown,
   ArrowUp,
-  BarChart3,
-  CalendarDays,
   Camera,
   Check,
   CheckCircle2,
@@ -24,9 +22,7 @@ import {
   ChevronRight,
   Cloud,
   Dumbbell,
-  Gauge,
   History,
-  LayoutDashboard,
   Mail,
   Moon,
   Palette,
@@ -34,7 +30,6 @@ import {
   Play,
   Plus,
   Save,
-  Scale,
   Sun,
   Timer,
   Trash2,
@@ -198,10 +193,8 @@ const navItems: { key: TabKey; label: string; icon: LucideIcon }[] = [
   { key: 'training', label: 'Training', icon: Dumbbell },
   { key: 'history', label: 'Historial', icon: History },
   { key: 'timeline', label: 'Timeline', icon: Camera },
-  { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
 ]
 
-const exerciseColors = ['#2563eb', '#0f9f6e', '#d97706', '#7c3aed', '#dc2626', '#0891b2', '#be185d', '#4f46e5']
 const brandMarkSrc = `${import.meta.env.BASE_URL}app-icon-192.png`
 const accentOptions: AccentOption[] = [
   { key: 'green', label: 'Verde', color: '#39b980' },
@@ -478,7 +471,6 @@ function App() {
   const [editingRoutineId, setEditingRoutineId] = useState('')
   const [selectedHistoryId, setSelectedHistoryId] = useState('')
   const [editingWorkoutId, setEditingWorkoutId] = useState('')
-  const [visibleExercises, setVisibleExercises] = useState<Set<string>>(() => new Set())
   const [now, setNow] = useState(() => Date.now())
   const [isAddingCheckIn, setIsAddingCheckIn] = useState(false)
   const [editingCheckInId, setEditingCheckInId] = useState('')
@@ -493,7 +485,6 @@ function App() {
     setState(savedState)
     setSelectedRoutineId(savedState.routines[0]?.id ?? '')
     setSelectedHistoryId('')
-    setVisibleExercises(new Set(getExerciseNames(savedState.workouts)))
 
     const latestCheckIn = [...savedState.checkIns].sort((a, b) => b.date.localeCompare(a.date))[0]
     if (latestCheckIn) {
@@ -916,7 +907,6 @@ function App() {
     }))
     setEditingWorkoutId('')
     setSelectedHistoryId(workout.id)
-    setVisibleExercises(new Set(getExerciseNames(stateRef.current.workouts.map((item) => (item.id === workout.id ? workout : item)))))
     vibrate(18)
   }
 
@@ -1201,14 +1191,6 @@ function App() {
           />
         )}
 
-        {activeTab === 'dashboard' && (
-          <DashboardView
-            checkIns={sortedCheckIns}
-            setVisibleExercises={setVisibleExercises}
-            visibleExercises={visibleExercises}
-            workouts={sortedWorkouts}
-          />
-        )}
       </main>
     </div>
   )
@@ -1770,11 +1752,11 @@ function HistoryView({
   updateWorkout: (workout: Workout) => void
   workouts: Workout[]
 }) {
-  const latestWorkoutMonth = workouts[0]?.date.slice(0, 7) ?? todayIso().slice(0, 7)
+  const focusedWorkout = selectedWorkout ?? workouts[0]
+  const latestWorkoutMonth = focusedWorkout?.date.slice(0, 7) ?? todayIso().slice(0, 7)
   const [visibleMonth, setVisibleMonth] = useState(latestWorkoutMonth)
-  const [selectedCalendarDate, setSelectedCalendarDate] = useState(workouts[0]?.date ?? todayIso())
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState(focusedWorkout?.date ?? todayIso())
   const calendarWasNavigatedRef = useRef(false)
-  const groupedWorkouts = useMemo(() => groupWorkoutsByMonth(workouts), [workouts])
   const calendarDays = useMemo(() => buildCalendarDays(visibleMonth, workouts), [visibleMonth, workouts])
   const monthWorkouts = useMemo(() => workouts.filter((workout) => workout.date.startsWith(visibleMonth)), [visibleMonth, workouts])
   const effectiveSelectedDate = selectedCalendarDate.startsWith(visibleMonth)
@@ -1791,8 +1773,8 @@ function HistoryView({
     }
 
     setVisibleMonth(latestWorkoutMonth)
-    setSelectedCalendarDate(workouts[0].date)
-  }, [latestWorkoutMonth, workouts])
+    setSelectedCalendarDate(focusedWorkout?.date ?? todayIso())
+  }, [focusedWorkout, latestWorkoutMonth, workouts.length])
 
   const changeCalendarMonth = (offset: number) => {
     vibrate(8)
@@ -1809,57 +1791,45 @@ function HistoryView({
         monthLabel={formatMonthKey(visibleMonth)}
         onChangeMonth={changeCalendarMonth}
         onSelectDate={setSelectedCalendarDate}
+        deleteWorkout={deleteWorkout}
+        editingWorkoutId={editingWorkoutId}
         selectedDate={effectiveSelectedDate}
+        selectedWorkoutId={selectedWorkout?.id ?? ''}
         selectedWorkouts={selectedDayWorkouts}
+        setEditingWorkoutId={setEditingWorkoutId}
+        setSelectedWorkoutId={setSelectedWorkoutId}
+        updateWorkout={updateWorkout}
       />
-
-      {workouts.length ? (
-        groupedWorkouts.map(({ month, items }) => (
-          <section className="history-month" key={month}>
-            <h2>{month}</h2>
-            <div className="history-cards">
-              {items.map((workout) => {
-                const isSelected = selectedWorkout?.id === workout.id
-
-                return (
-                  <HistoryWorkoutCard
-                    deleteWorkout={deleteWorkout}
-                    editingWorkoutId={editingWorkoutId}
-                    isSelected={isSelected}
-                    key={workout.id}
-                    setEditingWorkoutId={setEditingWorkoutId}
-                    setSelectedWorkoutId={setSelectedWorkoutId}
-                    updateWorkout={updateWorkout}
-                    workout={workout}
-                  />
-                )
-              })}
-            </div>
-          </section>
-        ))
-      ) : (
-        <section className="surface history-detail">
-          <EmptyState icon={History} label="Sin entrenamientos" />
-        </section>
-      )}
     </section>
   )
 }
 
 function HistoryCalendar({
+  deleteWorkout,
   days,
+  editingWorkoutId,
   monthLabel,
   onChangeMonth,
   onSelectDate,
   selectedDate,
+  selectedWorkoutId,
   selectedWorkouts,
+  setEditingWorkoutId,
+  setSelectedWorkoutId,
+  updateWorkout,
 }: {
+  deleteWorkout: (id: string) => void
   days: CalendarDay[]
+  editingWorkoutId: string
   monthLabel: string
   onChangeMonth: (offset: number) => void
   onSelectDate: (date: string) => void
   selectedDate: string
+  selectedWorkoutId: string
   selectedWorkouts: Workout[]
+  setEditingWorkoutId: Dispatch<SetStateAction<string>>
+  setSelectedWorkoutId: Dispatch<SetStateAction<string>>
+  updateWorkout: (workout: Workout) => void
 }) {
   const selectedDateLabel = formatDate(selectedDate)
 
@@ -1903,10 +1873,11 @@ function HistoryCalendar({
               onClick={() => {
                 vibrate(hasWorkout ? 10 : 4)
                 onSelectDate(day.date)
+                setEditingWorkoutId('')
+                setSelectedWorkoutId('')
               }}
             >
               <span>{day.dayNumber}</span>
-              {hasWorkout && <i>{day.workouts.length}</i>}
             </button>
           )
         })}
@@ -1915,12 +1886,35 @@ function HistoryCalendar({
       <div className="calendar-summary">
         <span>{selectedDateLabel}</span>
         {selectedWorkouts.length ? (
-          <div>
+          <div className="calendar-workouts">
             {selectedWorkouts.map((workout) => (
-              <p key={workout.id}>
-                <strong>{workout.routineName}</strong>
-                <small>{formatDuration(workout.durationSeconds)}</small>
-              </p>
+              <article className={selectedWorkoutId === workout.id ? 'calendar-workout expanded' : 'calendar-workout'} key={workout.id}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    vibrate(8)
+                    setEditingWorkoutId('')
+                    setSelectedWorkoutId((current) => (current === workout.id ? '' : workout.id))
+                  }}
+                >
+                  <strong>{workout.routineName}</strong>
+                  <small>{formatDuration(workout.durationSeconds)}</small>
+                </button>
+
+                {selectedWorkoutId === workout.id &&
+                  (editingWorkoutId === workout.id ? (
+                    <WorkoutEditor key={workout.id} onCancel={() => setEditingWorkoutId('')} onSave={updateWorkout} workout={workout} />
+                  ) : (
+                    <WorkoutDetail
+                      onDelete={() => deleteWorkout(workout.id)}
+                      onEdit={() => {
+                        vibrate(10)
+                        setEditingWorkoutId(workout.id)
+                      }}
+                      workout={workout}
+                    />
+                  ))}
+              </article>
             ))}
           </div>
         ) : (
@@ -1928,69 +1922,6 @@ function HistoryCalendar({
         )}
       </div>
     </section>
-  )
-}
-
-function HistoryWorkoutCard({
-  deleteWorkout,
-  editingWorkoutId,
-  isSelected,
-  setEditingWorkoutId,
-  setSelectedWorkoutId,
-  updateWorkout,
-  workout,
-}: {
-  deleteWorkout: (id: string) => void
-  editingWorkoutId: string
-  isSelected: boolean
-  setEditingWorkoutId: Dispatch<SetStateAction<string>>
-  setSelectedWorkoutId: Dispatch<SetStateAction<string>>
-  updateWorkout: (workout: Workout) => void
-  workout: Workout
-}) {
-  const swipe = useSwipeAction({
-    axis: 'x',
-    onDelete: () => deleteWorkout(workout.id),
-    onEdit: () => {
-      setSelectedWorkoutId(workout.id)
-      setEditingWorkoutId(workout.id)
-    },
-  })
-
-  return (
-    <article
-      className={[isSelected ? 'history-card selected' : 'history-card', swipe.className].filter(Boolean).join(' ')}
-      data-swipe={swipe.intent}
-      style={swipe.style}
-      {...swipe.handlers}
-    >
-      <button
-        type="button"
-        onClick={() => {
-          vibrate(8)
-          setEditingWorkoutId('')
-          setSelectedWorkoutId((current) => (current === workout.id ? '' : workout.id))
-        }}
-      >
-        <span>{formatShortDate(workout.date)}</span>
-        <strong>{workout.routineName}</strong>
-        <small>{formatDuration(workout.durationSeconds)}</small>
-      </button>
-
-      {isSelected &&
-        (editingWorkoutId === workout.id ? (
-          <WorkoutEditor key={workout.id} onCancel={() => setEditingWorkoutId('')} onSave={updateWorkout} workout={workout} />
-        ) : (
-          <WorkoutDetail
-            onDelete={() => deleteWorkout(workout.id)}
-            onEdit={() => {
-              vibrate(10)
-              setEditingWorkoutId(workout.id)
-            }}
-            workout={workout}
-          />
-        ))}
-    </article>
   )
 }
 
@@ -2570,218 +2501,6 @@ function CheckInEditor({
   )
 }
 
-function DashboardView({
-  checkIns,
-  setVisibleExercises,
-  visibleExercises,
-  workouts,
-}: {
-  checkIns: CheckIn[]
-  setVisibleExercises: Dispatch<SetStateAction<Set<string>>>
-  visibleExercises: Set<string>
-  workouts: Workout[]
-}) {
-  const monthKey = todayIso().slice(0, 7)
-  const monthCheckIns = checkIns.filter((checkIn) => checkIn.date.startsWith(monthKey))
-  const sortedMonthCheckIns = [...monthCheckIns].sort((a, b) => a.date.localeCompare(b.date))
-  const currentWeight = checkIns.at(-1)?.weight
-  const initialMonthWeight = sortedMonthCheckIns[0]?.weight ?? currentWeight
-  const monthWorkouts = workouts.filter((workout) => workout.date.startsWith(monthKey))
-  const monthCardioMinutes = monthWorkouts.reduce((total, workout) => total + (workout.cardio.durationMinutes ?? 0), 0)
-  const exerciseNames = useMemo(() => getExerciseNames(workouts), [workouts])
-  const metricWeight = (value?: number) => (value ? `${formatNumber(value)} kg` : '--')
-
-  useEffect(() => {
-    if (!visibleExercises.size && exerciseNames.length) {
-      setVisibleExercises(new Set(exerciseNames))
-    }
-  }, [exerciseNames, setVisibleExercises, visibleExercises.size])
-
-  const toggleExercise = (name: string) => {
-    vibrate(8)
-    setVisibleExercises((current) => {
-      const next = new Set(current)
-      if (next.has(name)) {
-        next.delete(name)
-      } else {
-        next.add(name)
-      }
-      return next
-    })
-  }
-
-  return (
-    <section className="page-stack enter">
-      <div className="metric-grid">
-        <MetricCard icon={CalendarDays} label="Inicio mes" value={metricWeight(initialMonthWeight)} />
-        <MetricCard icon={Scale} label="Actual" value={metricWeight(currentWeight)} />
-        <MetricCard icon={Dumbbell} label="Entrenos mes" value={String(monthWorkouts.length)} />
-        <MetricCard icon={Gauge} label="Cardio mes" value={`${formatNumber(monthCardioMinutes)} min`} />
-      </div>
-
-      <section className="surface chart-card">
-        <SectionTitle icon={BarChart3} title="Peso total" />
-        <WeightChart checkIns={checkIns} />
-      </section>
-
-      <section className="surface chart-card">
-        <div className="section-title chart-title">
-          <span>
-            <Dumbbell size={18} />
-            Ejercicios
-          </span>
-        </div>
-        <ExerciseMultiChart visibleExercises={visibleExercises} workouts={workouts} />
-        <div className="toggle-grid">
-          {exerciseNames.map((name, index) => (
-            <button
-              className={visibleExercises.has(name) ? 'line-toggle active' : 'line-toggle'}
-              key={name}
-              style={{ '--line-color': exerciseColors[index % exerciseColors.length] } as CSSProperties}
-              type="button"
-              onClick={() => toggleExercise(name)}
-            >
-              <span />
-              {name}
-            </button>
-          ))}
-        </div>
-      </section>
-    </section>
-  )
-}
-
-function WeightChart({ checkIns }: { checkIns: CheckIn[] }) {
-  const points = [...checkIns].sort((a, b) => a.date.localeCompare(b.date))
-
-  if (points.length < 2) {
-    return <EmptyState icon={Scale} label="Sin datos" />
-  }
-
-  const width = 900
-  const height = 300
-  const padding = 34
-  const weights = points.map((point) => point.weight)
-  const min = Math.min(...weights) - 0.6
-  const max = Math.max(...weights) + 0.6
-  const range = max - min || 1
-  const coords = points.map((point, index) => {
-    const x = padding + (index / Math.max(points.length - 1, 1)) * (width - padding * 2)
-    const y = padding + ((max - point.weight) / range) * (height - padding * 2)
-    return { x, y, point }
-  })
-  const polyline = coords.map(({ x, y }) => `${x},${y}`).join(' ')
-
-  return (
-    <div className="chart-wrap">
-      <svg aria-label="Grafica de peso" viewBox={`0 0 ${width} ${height}`}>
-        <ChartGrid height={height} padding={padding} width={width} />
-        <polygon className="chart-area" points={`${padding},${height - padding} ${polyline} ${width - padding},${height - padding}`} />
-        <polyline className="chart-line" points={polyline} />
-        {coords.map(({ x, y, point }) => (
-          <g key={point.id}>
-            <circle cx={x} cy={y} r="5" />
-            <text x={x} y={height - 10}>
-              {formatShortDate(point.date)}
-            </text>
-          </g>
-        ))}
-      </svg>
-    </div>
-  )
-}
-
-function ExerciseMultiChart({ visibleExercises, workouts }: { visibleExercises: Set<string>; workouts: Workout[] }) {
-  const series = buildExerciseSeries(workouts).filter((item) => visibleExercises.has(item.name))
-  const allPoints = series.flatMap((item) => item.points)
-
-  if (!allPoints.length) {
-    return <EmptyState icon={Dumbbell} label="Sin datos" />
-  }
-
-  const width = 900
-  const height = 340
-  const padding = 40
-  const dates = Array.from(new Set(workouts.map((workout) => workout.date))).sort((a, b) => a.localeCompare(b))
-  const weights = allPoints.map((point) => point.weight)
-  const min = Math.max(0, Math.min(...weights) - 5)
-  const max = Math.max(...weights) + 5
-  const range = max - min || 1
-  const xForDate = (date: string) => padding + (dates.indexOf(date) / Math.max(dates.length - 1, 1)) * (width - padding * 2)
-  const yForWeight = (weight: number) => padding + ((max - weight) / range) * (height - padding * 2)
-
-  return (
-    <div className="chart-wrap multi">
-      <svg aria-label="Grafica de ejercicios" viewBox={`0 0 ${width} ${height}`}>
-        <ChartGrid height={height} padding={padding} width={width} />
-        {series.map((item, index) => {
-          const color = exerciseColors[index % exerciseColors.length]
-          const points = item.points.map((point) => ({
-            ...point,
-            x: xForDate(point.date),
-            y: yForWeight(point.weight),
-          }))
-          const polyline = points.map((point) => `${point.x},${point.y}`).join(' ')
-          const avgReps = points.reduce((total, point) => total + point.reps, 0) / Math.max(points.length, 1)
-
-          return (
-            <g key={item.name}>
-              <polyline
-                fill="none"
-                points={polyline}
-                stroke={color}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={Math.max(2, Math.min(9, avgReps / 1.4))}
-              />
-              {points.map((point) => (
-                <circle cx={point.x} cy={point.y} fill="var(--surface)" key={`${item.name}-${point.date}`} r="4" stroke={color} strokeWidth="2" />
-              ))}
-            </g>
-          )
-        })}
-        {dates.map((date) => (
-          <text key={date} x={xForDate(date)} y={height - 10}>
-            {formatShortDate(date)}
-          </text>
-        ))}
-      </svg>
-    </div>
-  )
-}
-
-function ChartGrid({ height, padding, width }: { height: number; padding: number; width: number }) {
-  return (
-    <>
-      {[0, 1, 2, 3].map((line) => {
-        const y = padding + (line / 3) * (height - padding * 2)
-        return <line className="chart-grid-line" key={line} x1={padding} x2={width - padding} y1={y} y2={y} />
-      })}
-    </>
-  )
-}
-
-function MetricCard({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {
-  return (
-    <article className="metric-card">
-      <Icon size={19} />
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </article>
-  )
-}
-
-function SectionTitle({ icon: Icon, title }: { icon: LucideIcon; title: string }) {
-  return (
-    <div className="section-title">
-      <span>
-        <Icon size={18} />
-        {title}
-      </span>
-    </div>
-  )
-}
-
 function Field({ children, label }: { children: ReactNode; label: string }) {
   return (
     <label className="field">
@@ -2789,32 +2508,6 @@ function Field({ children, label }: { children: ReactNode; label: string }) {
       {children}
     </label>
   )
-}
-
-function EmptyState({ icon: Icon, label }: { icon: LucideIcon; label: string }) {
-  return (
-    <div className="empty-state">
-      <Icon size={30} />
-      <span>{label}</span>
-    </div>
-  )
-}
-
-function getExerciseNames(workouts: Workout[]) {
-  return Array.from(new Set(workouts.flatMap((workout) => workout.exercises.map((exercise) => exercise.name)))).sort((a, b) =>
-    a.localeCompare(b),
-  )
-}
-
-function groupWorkoutsByMonth(workouts: Workout[]) {
-  const grouped = new Map<string, Workout[]>()
-
-  workouts.forEach((workout) => {
-    const month = formatMonth(workout.date)
-    grouped.set(month, [...(grouped.get(month) ?? []), workout])
-  })
-
-  return [...grouped.entries()].map(([month, items]) => ({ month, items }))
 }
 
 function buildCalendarDays(monthKey: string, workouts: Workout[]): CalendarDay[] {
@@ -2838,31 +2531,6 @@ function buildCalendarDays(monthKey: string, workouts: Workout[]): CalendarDay[]
       workouts: workoutsByDate.get(dateKey) ?? [],
     }
   })
-}
-
-function buildExerciseSeries(workouts: Workout[]) {
-  const grouped = new Map<string, { date: string; weight: number; reps: number }[]>()
-
-  ;[...workouts]
-    .sort((a, b) => a.date.localeCompare(b.date))
-    .forEach((workout) => {
-      workout.exercises.forEach((exercise) => {
-        const completed = exercise.sets.filter((set) => set.completed && set.weight !== null && set.reps !== null)
-        if (!completed.length) {
-          return
-        }
-
-        const bestWeight = Math.max(...completed.map((set) => set.weight ?? 0))
-        const repsAtBestWeight = completed
-          .filter((set) => set.weight === bestWeight)
-          .reduce((total, set) => total + (set.reps ?? 0), 0)
-        const points = grouped.get(exercise.name) ?? []
-        points.push({ date: workout.date, weight: bestWeight, reps: repsAtBestWeight })
-        grouped.set(exercise.name, points)
-      })
-    })
-
-  return [...grouped.entries()].map(([name, points]) => ({ name, points }))
 }
 
 export default App

@@ -1,4 +1,4 @@
-export type TabKey = 'training' | 'history' | 'timeline' | 'dashboard'
+export type TabKey = 'training' | 'history' | 'timeline'
 
 export type ThemeMode = 'light' | 'dark'
 
