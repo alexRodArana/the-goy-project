@@ -125,6 +125,11 @@ const toLocalDate = (value: string) => new Date(`${value}T12:00:00`)
 
 const toMonthKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
 
+const getWorkoutStartDate = (workout: Workout) => {
+  const startedAt = new Date(workout.startedAt)
+  return Number.isNaN(startedAt.getTime()) ? workout.date : toDateKey(startedAt)
+}
+
 const formatDate = (value: string) =>
   new Intl.DateTimeFormat('es-MX', {
     day: 'numeric',
@@ -688,7 +693,10 @@ function App() {
     [state.checkIns],
   )
   const sortedWorkouts = useMemo(
-    () => [...state.workouts].sort((a, b) => b.date.localeCompare(a.date)),
+    () =>
+      [...state.workouts].sort(
+        (a, b) => getWorkoutStartDate(b).localeCompare(getWorkoutStartDate(a)) || b.startedAt.localeCompare(a.startedAt),
+      ),
     [state.workouts],
   )
   const selectedRoutine = state.routines.find((routine) => routine.id === selectedRoutineId) ?? state.routines[0]
@@ -1753,17 +1761,22 @@ function HistoryView({
   workouts: Workout[]
 }) {
   const focusedWorkout = selectedWorkout ?? workouts[0]
-  const latestWorkoutMonth = focusedWorkout?.date.slice(0, 7) ?? todayIso().slice(0, 7)
+  const focusedWorkoutDate = focusedWorkout ? getWorkoutStartDate(focusedWorkout) : todayIso()
+  const latestWorkoutMonth = focusedWorkoutDate.slice(0, 7)
   const [visibleMonth, setVisibleMonth] = useState(latestWorkoutMonth)
-  const [selectedCalendarDate, setSelectedCalendarDate] = useState(focusedWorkout?.date ?? todayIso())
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState(focusedWorkoutDate)
+  const [expandedWorkoutId, setExpandedWorkoutId] = useState('')
   const calendarWasNavigatedRef = useRef(false)
   const calendarDays = useMemo(() => buildCalendarDays(visibleMonth, workouts), [visibleMonth, workouts])
-  const monthWorkouts = useMemo(() => workouts.filter((workout) => workout.date.startsWith(visibleMonth)), [visibleMonth, workouts])
+  const monthWorkouts = useMemo(
+    () => workouts.filter((workout) => getWorkoutStartDate(workout).startsWith(visibleMonth)),
+    [visibleMonth, workouts],
+  )
   const effectiveSelectedDate = selectedCalendarDate.startsWith(visibleMonth)
     ? selectedCalendarDate
-    : monthWorkouts[0]?.date ?? `${visibleMonth}-01`
+    : monthWorkouts[0] ? getWorkoutStartDate(monthWorkouts[0]) : `${visibleMonth}-01`
   const selectedDayWorkouts = useMemo(
-    () => workouts.filter((workout) => workout.date === effectiveSelectedDate),
+    () => workouts.filter((workout) => getWorkoutStartDate(workout) === effectiveSelectedDate),
     [effectiveSelectedDate, workouts],
   )
 
@@ -1773,15 +1786,19 @@ function HistoryView({
     }
 
     setVisibleMonth(latestWorkoutMonth)
-    setSelectedCalendarDate(focusedWorkout?.date ?? todayIso())
-  }, [focusedWorkout, latestWorkoutMonth, workouts.length])
+    setSelectedCalendarDate(focusedWorkoutDate)
+  }, [focusedWorkoutDate, latestWorkoutMonth, workouts.length])
 
   const changeCalendarMonth = (offset: number) => {
     vibrate(8)
     calendarWasNavigatedRef.current = true
     const nextMonth = addMonths(visibleMonth, offset)
+    const nextWorkout = workouts.find((workout) => getWorkoutStartDate(workout).startsWith(nextMonth))
     setVisibleMonth(nextMonth)
-    setSelectedCalendarDate(workouts.find((workout) => workout.date.startsWith(nextMonth))?.date ?? `${nextMonth}-01`)
+    setSelectedCalendarDate(nextWorkout ? getWorkoutStartDate(nextWorkout) : `${nextMonth}-01`)
+    setExpandedWorkoutId('')
+    setEditingWorkoutId('')
+    setSelectedWorkoutId('')
   }
 
   return (
@@ -1793,10 +1810,11 @@ function HistoryView({
         onSelectDate={setSelectedCalendarDate}
         deleteWorkout={deleteWorkout}
         editingWorkoutId={editingWorkoutId}
+        expandedWorkoutId={expandedWorkoutId}
         selectedDate={effectiveSelectedDate}
-        selectedWorkoutId={selectedWorkout?.id ?? ''}
         selectedWorkouts={selectedDayWorkouts}
         setEditingWorkoutId={setEditingWorkoutId}
+        setExpandedWorkoutId={setExpandedWorkoutId}
         setSelectedWorkoutId={setSelectedWorkoutId}
         updateWorkout={updateWorkout}
       />
@@ -1808,26 +1826,28 @@ function HistoryCalendar({
   deleteWorkout,
   days,
   editingWorkoutId,
+  expandedWorkoutId,
   monthLabel,
   onChangeMonth,
   onSelectDate,
   selectedDate,
-  selectedWorkoutId,
   selectedWorkouts,
   setEditingWorkoutId,
+  setExpandedWorkoutId,
   setSelectedWorkoutId,
   updateWorkout,
 }: {
   deleteWorkout: (id: string) => void
   days: CalendarDay[]
   editingWorkoutId: string
+  expandedWorkoutId: string
   monthLabel: string
   onChangeMonth: (offset: number) => void
   onSelectDate: (date: string) => void
   selectedDate: string
-  selectedWorkoutId: string
   selectedWorkouts: Workout[]
   setEditingWorkoutId: Dispatch<SetStateAction<string>>
+  setExpandedWorkoutId: Dispatch<SetStateAction<string>>
   setSelectedWorkoutId: Dispatch<SetStateAction<string>>
   updateWorkout: (workout: Workout) => void
 }) {
@@ -1874,6 +1894,7 @@ function HistoryCalendar({
                 vibrate(hasWorkout ? 10 : 4)
                 onSelectDate(day.date)
                 setEditingWorkoutId('')
+                setExpandedWorkoutId('')
                 setSelectedWorkoutId('')
               }}
             >
@@ -1888,20 +1909,22 @@ function HistoryCalendar({
         {selectedWorkouts.length ? (
           <div className="calendar-workouts">
             {selectedWorkouts.map((workout) => (
-              <article className={selectedWorkoutId === workout.id ? 'calendar-workout expanded' : 'calendar-workout'} key={workout.id}>
+              <article className={expandedWorkoutId === workout.id ? 'calendar-workout expanded' : 'calendar-workout'} key={workout.id}>
                 <button
                   type="button"
                   onClick={() => {
                     vibrate(8)
+                    const willExpand = expandedWorkoutId !== workout.id
                     setEditingWorkoutId('')
-                    setSelectedWorkoutId((current) => (current === workout.id ? '' : workout.id))
+                    setExpandedWorkoutId(willExpand ? workout.id : '')
+                    setSelectedWorkoutId(willExpand ? workout.id : '')
                   }}
                 >
                   <strong>{workout.routineName}</strong>
                   <small>{formatDuration(workout.durationSeconds)}</small>
                 </button>
 
-                {selectedWorkoutId === workout.id &&
+                {expandedWorkoutId === workout.id &&
                   (editingWorkoutId === workout.id ? (
                     <WorkoutEditor key={workout.id} onCancel={() => setEditingWorkoutId('')} onSave={updateWorkout} workout={workout} />
                   ) : (
@@ -1909,6 +1932,8 @@ function HistoryCalendar({
                       onDelete={() => deleteWorkout(workout.id)}
                       onEdit={() => {
                         vibrate(10)
+                        setExpandedWorkoutId(workout.id)
+                        setSelectedWorkoutId(workout.id)
                         setEditingWorkoutId(workout.id)
                       }}
                       workout={workout}
@@ -2517,7 +2542,8 @@ function buildCalendarDays(monthKey: string, workouts: Workout[]): CalendarDay[]
   const workoutsByDate = new Map<string, Workout[]>()
 
   workouts.forEach((workout) => {
-    workoutsByDate.set(workout.date, [...(workoutsByDate.get(workout.date) ?? []), workout])
+    const startDate = getWorkoutStartDate(workout)
+    workoutsByDate.set(startDate, [...(workoutsByDate.get(startDate) ?? []), workout])
   })
 
   return Array.from({ length: 42 }, (_, index) => {
