@@ -21,6 +21,10 @@ const isValidUrl = (value: unknown) => {
 }
 
 const canInitializeSupabase = isValidUrl(supabaseUrl) && Boolean(supabaseAnonKey)
+const SHARED_TABLE = 'goy_app_state'
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null
 
 const getAuthRedirectUrl = () => {
   const redirectUrl = new URL(window.location.pathname || '/', window.location.origin)
@@ -140,7 +144,7 @@ export const loadRemoteState = async (userId: string): Promise<AppState> => {
   }
 
   const { data, error } = await supabase
-    .from('goy_app_state')
+    .from(SHARED_TABLE)
     .select('state')
     .eq('user_id', userId)
     .maybeSingle()
@@ -157,10 +161,22 @@ export const saveRemoteState = async (userId: string, state: AppState) => {
     return
   }
 
-  const { error } = await supabase.from('goy_app_state').upsert(
+  const { data, error: readError } = await supabase.from(SHARED_TABLE).select('state').eq('user_id', userId).maybeSingle()
+
+  if (readError) {
+    throw readError
+  }
+
+  const sharedState = isRecord(data?.state) ? data.state : {}
+  const nextState = {
+    ...sharedState,
+    ...state,
+  }
+
+  const { error } = await supabase.from(SHARED_TABLE).upsert(
     {
       user_id: userId,
-      state,
+      state: nextState,
       updated_at: new Date().toISOString(),
     },
     {
