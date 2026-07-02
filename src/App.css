@@ -219,6 +219,70 @@ html:not([data-theme='dark']) .brand-mark img {
   letter-spacing: 0;
 }
 
+.rest-timer-context {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 820;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rest-timer-presets {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.rest-timer-presets button,
+.rest-notification-button,
+.rest-notification-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 0 9px;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 850;
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+}
+
+.rest-timer-presets button {
+  cursor: pointer;
+}
+
+.rest-timer-presets button.active {
+  color: var(--brand-ink);
+  background: var(--brand-soft);
+  border-color: var(--brand-line);
+}
+
+.rest-notification-button {
+  width: 100%;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.rest-notification-status.granted {
+  color: var(--brand-ink);
+  background: var(--brand-soft);
+  border-color: var(--brand-line);
+}
+
+.rest-notification-status.denied,
+.rest-notification-status.unsupported {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 10%, var(--surface));
+  border-color: color-mix(in srgb, var(--danger) 34%, var(--line));
+}
+
 .rest-timer-controls {
   display: grid;
   grid-template-columns: 44px 44px minmax(0, 1fr) 44px;
@@ -1527,6 +1591,17 @@ button:not(:disabled):active {
   .rest-timer-controls {
     grid-template-columns: 42px 42px minmax(0, 1fr) 42px;
     gap: 7px;
+  }
+
+  .rest-timer-popover > strong {
+    font-size: 32px;
+  }
+
+  .rest-timer-presets button,
+  .rest-notification-button,
+  .rest-notification-status {
+    min-height: 34px;
+    border-radius: 10px;
   }
 
   .tabs {

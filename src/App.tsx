@@ -76,6 +76,22 @@ type AccentOption = {
   color: string
 }
 
+type NotificationState = NotificationPermission | 'unsupported'
+
+type ScreenWakeLockSentinel = {
+  release: () => Promise<void>
+  addEventListener?: (type: 'release', listener: EventListener) => void
+  removeEventListener?: (type: 'release', listener: EventListener) => void
+}
+
+type EnhancedNavigator = Navigator & {
+  wakeLock?: {
+    request: (type: 'screen') => Promise<ScreenWakeLockSentinel>
+  }
+  setAppBadge?: (contents?: number) => Promise<void>
+  clearAppBadge?: () => Promise<void>
+}
+
 type CalendarDay = {
   date: string
   dayNumber: number
@@ -224,6 +240,11 @@ const accentOptions: AccentOption[] = [
   { key: 'orange', label: 'Naranja', color: '#d97706' },
   { key: 'rose', label: 'Rosa', color: '#be185d' },
 ]
+
+const APP_TITLE = 'The Goy Project'
+const DEFAULT_REST_SECONDS = 90
+const REST_PRESETS = [60, 90, 120]
+
 const trainingPhrases = [
   'Goy mode off, disciplina Judia on.',
   'Del Goy al modo Kosher, una serie a la vez.',
@@ -365,6 +386,55 @@ const hasCardioEntry = (cardio?: CardioSession) =>
 const formatCardioNumber = (value: number | null | undefined, suffix: string) =>
   value === null || value === undefined ? '--' : `${formatNumber(value)} ${suffix}`
 
+const getNotificationState = (): NotificationState => {
+  if (!('Notification' in window)) {
+    return 'unsupported'
+  }
+
+  return Notification.permission
+}
+
+const playRestCompleteSound = () => {
+  try {
+    const AudioContextConstructor =
+      window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+    if (!AudioContextConstructor) {
+      return
+    }
+
+    const audioContext = new AudioContextConstructor()
+    const oscillator = audioContext.createOscillator()
+    const gain = audioContext.createGain()
+
+    oscillator.type = 'sine'
+    oscillator.frequency.setValueAtTime(880, audioContext.currentTime)
+    oscillator.frequency.setValueAtTime(660, audioContext.currentTime + 0.14)
+    gain.gain.setValueAtTime(0.001, audioContext.currentTime)
+    gain.gain.exponentialRampToValueAtTime(0.18, audioContext.currentTime + 0.02)
+    gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.45)
+    oscillator.connect(gain)
+    gain.connect(audioContext.destination)
+    oscillator.start()
+    oscillator.stop(audioContext.currentTime + 0.48)
+  } catch {
+    // Audio feedback is best-effort and may be blocked by the platform.
+  }
+}
+
+const setRestTimerBadge = () => {
+  const request = (navigator as EnhancedNavigator).setAppBadge?.(1)
+  if (request) {
+    void request.catch(() => undefined)
+  }
+}
+
+const clearRestTimerBadge = () => {
+  const request = (navigator as EnhancedNavigator).clearAppBadge?.()
+  if (request) {
+    void request.catch(() => undefined)
+  }
+}
+
 const hasUserData = (value: AppState) =>
   Boolean(value.checkIns.length || value.routines.length || value.workouts.length || value.activeWorkout)
 
@@ -498,6 +568,8 @@ function App() {
   const authHydrationRef = useRef(0)
   const initialAuthHandledRef = useRef(false)
   const isHydratingRef = useRef(false)
+  const restTimerAlertedRef = useRef(false)
+  const wakeLockRef = useRef<ScreenWakeLockSentinel | null>(null)
   const [isLoaded, setIsLoaded] = useState(false)
   const [session, setSession] = useState<SyncSession | null>(null)
   const [syncEmail, setSyncEmail] = useState('')
@@ -525,9 +597,10 @@ function App() {
   const [selectedHistoryId, setSelectedHistoryId] = useState('')
   const [editingWorkoutId, setEditingWorkoutId] = useState('')
   const [now, setNow] = useState(() => Date.now())
-  const [restTimerSeconds, setRestTimerSeconds] = useState(0)
+  const [restTimerSeconds, setRestTimerSeconds] = useState(DEFAULT_REST_SECONDS)
   const [isRestTimerRunning, setIsRestTimerRunning] = useState(false)
   const [isRestTimerOpen, setIsRestTimerOpen] = useState(false)
+  const [notificationPermission, setNotificationPermission] = useState<NotificationState>(() => getNotificationState())
   const [isAddingCheckIn, setIsAddingCheckIn] = useState(false)
   const [editingCheckInId, setEditingCheckInId] = useState('')
   const [checkInDraft, setCheckInDraft] = useState({
@@ -733,15 +806,6 @@ function App() {
   }, [activeWorkoutId])
 
   useEffect(() => {
-    if (!activeWorkoutId || !isRestTimerRunning) {
-      return
-    }
-
-    const interval = window.setInterval(() => setRestTimerSeconds((seconds) => seconds + 1), 1000)
-    return () => window.clearInterval(interval)
-  }, [activeWorkoutId, isRestTimerRunning])
-
-  useEffect(() => {
     if (syncCooldown <= 0) {
       return
     }
@@ -790,9 +854,165 @@ function App() {
       (workout) => workout.routineId === activeRoutineId || normalizeName(workout.routineName) === normalizedRoutineName,
     )
   }, [activeRoutineId, activeRoutineName, sortedWorkouts])
+  const restTimerContext = useMemo(() => {
+    if (!state.activeWorkout) {
+      return ''
+    }
+
+    for (const exercise of state.activeWorkout.exercises) {
+      const nextSet = exercise.sets.find((set) => !set.completed)
+      if (nextSet) {
+        return `${exercise.name} · serie ${nextSet.setNumber}`
+      }
+    }
+
+    return 'Entrenamiento completo'
+  }, [state.activeWorkout])
   const isTrainingFocus = activeTab === 'training' && Boolean(state.activeWorkout || trainingMode !== 'home')
   const mainClassName = ['main', `main-${activeTab}`, isTrainingFocus ? 'main-focus' : ''].filter(Boolean).join(' ')
   const currentAccent = accentOptions.find((option) => option.key === accent) ?? accentOptions[0]
+  const shouldKeepScreenAwake = Boolean(activeWorkoutId && isRestTimerRunning && restTimerSeconds > 0)
+
+  const releaseWakeLock = useCallback(() => {
+    const wakeLock = wakeLockRef.current
+    if (!wakeLock) {
+      return
+    }
+
+    wakeLockRef.current = null
+    void wakeLock.release().catch(() => undefined)
+  }, [])
+
+  const requestWakeLock = useCallback(async () => {
+    const wakeLockApi = (navigator as EnhancedNavigator).wakeLock
+    if (wakeLockRef.current || !wakeLockApi || document.visibilityState !== 'visible') {
+      return
+    }
+
+    try {
+      const wakeLock = await wakeLockApi.request('screen')
+      const handleRelease = () => {
+        if (wakeLockRef.current === wakeLock) {
+          wakeLockRef.current = null
+        }
+        wakeLock.removeEventListener?.('release', handleRelease)
+      }
+
+      wakeLock.addEventListener?.('release', handleRelease)
+      wakeLockRef.current = wakeLock
+    } catch {
+      // Wake Lock is progressive enhancement and may be unavailable on the device.
+    }
+  }, [])
+
+  const requestNotificationPermission = useCallback(async () => {
+    if (!('Notification' in window)) {
+      setNotificationPermission('unsupported')
+      return
+    }
+
+    const permission = await Notification.requestPermission()
+    setNotificationPermission(permission)
+    if (permission === 'granted') {
+      vibrate(8)
+    }
+  }, [])
+
+  const notifyRestTimerComplete = useCallback(async () => {
+    setRestTimerBadge()
+    vibrate([160, 80, 160, 80, 260])
+    playRestCompleteSound()
+
+    if (getNotificationState() !== 'granted') {
+      setNotificationPermission(getNotificationState())
+      return
+    }
+
+    const title = 'Descanso terminado'
+    const options: NotificationOptions = {
+      body: restTimerContext ? `Siguiente: ${restTimerContext}` : 'Vuelve a la rutina.',
+      badge: `${import.meta.env.BASE_URL}app-icon-192.png`,
+      icon: `${import.meta.env.BASE_URL}app-icon-192.png`,
+      tag: 'the-goy-rest-timer',
+    }
+
+    try {
+      const registration = 'serviceWorker' in navigator ? await navigator.serviceWorker.getRegistration() : undefined
+      if (registration) {
+        await registration.showNotification(title, options)
+      } else {
+        new Notification(title, options)
+      }
+    } catch (error) {
+      console.error('Could not show rest timer notification', error)
+    }
+  }, [restTimerContext])
+
+  useEffect(() => {
+    if (!activeWorkoutId || !isRestTimerRunning) {
+      return
+    }
+
+    const interval = window.setInterval(() => {
+      setRestTimerSeconds((seconds) => {
+        if (seconds <= 1) {
+          if (!restTimerAlertedRef.current) {
+            restTimerAlertedRef.current = true
+            window.setTimeout(() => {
+              setIsRestTimerRunning(false)
+              void notifyRestTimerComplete()
+            }, 0)
+          }
+          return 0
+        }
+
+        return seconds - 1
+      })
+    }, 1000)
+
+    return () => window.clearInterval(interval)
+  }, [activeWorkoutId, isRestTimerRunning, notifyRestTimerComplete])
+
+  useEffect(() => {
+    if (!shouldKeepScreenAwake) {
+      releaseWakeLock()
+      return
+    }
+
+    void requestWakeLock()
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void requestWakeLock()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      releaseWakeLock()
+    }
+  }, [releaseWakeLock, requestWakeLock, shouldKeepScreenAwake])
+
+  useEffect(() => {
+    if (!activeWorkoutId) {
+      document.title = APP_TITLE
+      clearRestTimerBadge()
+      return
+    }
+
+    if (restTimerSeconds === 0 && restTimerAlertedRef.current) {
+      document.title = `Descanso listo - ${APP_TITLE}`
+      return
+    }
+
+    if (isRestTimerRunning) {
+      document.title = `${formatRestDuration(restTimerSeconds)} descanso - ${APP_TITLE}`
+      return
+    }
+
+    document.title = `${state.activeWorkout?.routineName ?? 'Training'} - ${formatDuration(elapsedSeconds)}`
+  }, [activeWorkoutId, elapsedSeconds, isRestTimerRunning, restTimerSeconds, state.activeWorkout?.routineName])
 
   const setActiveTab = (tab: TabKey) => {
     if (tab !== activeTab) {
@@ -1023,7 +1243,9 @@ function App() {
     }
 
     setNow(Date.now())
-    setRestTimerSeconds(0)
+    restTimerAlertedRef.current = false
+    clearRestTimerBadge()
+    setRestTimerSeconds(DEFAULT_REST_SECONDS)
     setIsRestTimerRunning(false)
     setIsRestTimerOpen(false)
     setTrainingMode('home')
@@ -1121,7 +1343,9 @@ function App() {
       activeWorkout: undefined,
       workouts: [workout, ...current.workouts],
     }))
-    setRestTimerSeconds(0)
+    restTimerAlertedRef.current = false
+    clearRestTimerBadge()
+    setRestTimerSeconds(DEFAULT_REST_SECONDS)
     setIsRestTimerRunning(false)
     setIsRestTimerOpen(false)
     setSelectedHistoryId(workout.id)
@@ -1142,21 +1366,43 @@ function App() {
         <div className="header-actions">
           {state.activeWorkout && (
             <RestTimer
+              contextLabel={restTimerContext}
               isOpen={isRestTimerOpen}
               isRunning={isRestTimerRunning}
+              notificationPermission={notificationPermission}
               seconds={restTimerSeconds}
               adjust={(delta) => {
+                restTimerAlertedRef.current = false
+                clearRestTimerBadge()
                 setRestTimerSeconds((seconds) => Math.max(0, seconds + delta))
                 vibrate(6)
               }}
+              requestNotifications={requestNotificationPermission}
               reset={() => {
-                setRestTimerSeconds(0)
+                restTimerAlertedRef.current = false
+                clearRestTimerBadge()
+                setRestTimerSeconds(DEFAULT_REST_SECONDS)
                 setIsRestTimerRunning(false)
                 vibrate(8)
               }}
+              setPreset={(seconds) => {
+                restTimerAlertedRef.current = false
+                clearRestTimerBadge()
+                setRestTimerSeconds(seconds)
+                setIsRestTimerRunning(false)
+                vibrate(6)
+              }}
               setIsOpen={setIsRestTimerOpen}
               toggle={() => {
-                setIsRestTimerRunning((running) => !running)
+                setRestTimerSeconds((seconds) => (seconds === 0 ? DEFAULT_REST_SECONDS : seconds))
+                setIsRestTimerRunning((running) => {
+                  const nextRunning = !running
+                  if (nextRunning) {
+                    restTimerAlertedRef.current = false
+                    clearRestTimerBadge()
+                  }
+                  return nextRunning
+                })
                 vibrate(8)
               }}
             />
@@ -1322,21 +1568,38 @@ function App() {
 
 function RestTimer({
   adjust,
+  contextLabel,
   isOpen,
   isRunning,
+  notificationPermission,
+  requestNotifications,
   reset,
   seconds,
+  setPreset,
   setIsOpen,
   toggle,
 }: {
   adjust: (delta: number) => void
+  contextLabel: string
   isOpen: boolean
   isRunning: boolean
+  notificationPermission: NotificationState
+  requestNotifications: () => void
   reset: () => void
   seconds: number
+  setPreset: (seconds: number) => void
   setIsOpen: Dispatch<SetStateAction<boolean>>
   toggle: () => void
 }) {
+  const notificationLabel =
+    notificationPermission === 'granted'
+      ? 'Alertas activas'
+      : notificationPermission === 'denied'
+        ? 'Alertas bloqueadas'
+        : notificationPermission === 'unsupported'
+          ? 'Alertas no disponibles'
+          : 'Activar alertas'
+
   return (
     <div className="rest-timer">
       <button
@@ -1358,6 +1621,19 @@ function RestTimer({
         <div className="rest-timer-popover">
           <span>Descanso</span>
           <strong>{formatRestDuration(seconds)}</strong>
+          {contextLabel && <em className="rest-timer-context">{contextLabel}</em>}
+          <div className="rest-timer-presets">
+            {REST_PRESETS.map((preset) => (
+              <button
+                className={seconds === preset ? 'active' : ''}
+                key={preset}
+                type="button"
+                onClick={() => setPreset(preset)}
+              >
+                {Math.round(preset / 60)}:{String(preset % 60).padStart(2, '0')}
+              </button>
+            ))}
+          </div>
           <div className="rest-timer-controls">
             <button aria-label="Restar 15 segundos" className="icon-button flat" type="button" onClick={() => adjust(-15)}>
               <Minus size={17} />
@@ -1379,6 +1655,13 @@ function RestTimer({
               <small>15</small>
             </button>
           </div>
+          {notificationPermission === 'default' ? (
+            <button className="rest-notification-button" type="button" onClick={requestNotifications}>
+              {notificationLabel}
+            </button>
+          ) : (
+            <span className={`rest-notification-status ${notificationPermission}`}>{notificationLabel}</span>
+          )}
         </div>
       )}
     </div>

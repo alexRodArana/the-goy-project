@@ -1,4 +1,4 @@
-const CACHE_NAME = 'the-goy-project-v4'
+const CACHE_NAME = 'the-goy-project-v5'
 const SCOPE = self.registration.scope
 const APP_SHELL = [
   SCOPE,
@@ -58,6 +58,20 @@ self.addEventListener('fetch', (event) => {
         }
         return response
       })
+    }),
+  )
+})
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+  event.waitUntil(
+    clients.matchAll({ includeUncontrolled: true, type: 'window' }).then((clientList) => {
+      const appClient = clientList.find((client) => client.url.startsWith(SCOPE))
+      if (appClient) {
+        return appClient.focus()
+      }
+
+      return clients.openWindow(SCOPE)
     }),
   )
 })
