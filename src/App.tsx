@@ -24,11 +24,14 @@ import {
   Dumbbell,
   History,
   Mail,
+  Minus,
   Moon,
   Palette,
+  Pause,
   Pencil,
   Play,
   Plus,
+  RotateCcw,
   Save,
   Sun,
   Timer,
@@ -163,6 +166,19 @@ const formatDuration = (seconds: number) => {
   const rest = safeSeconds % 60
 
   return [hours, minutes, rest].map((part) => String(part).padStart(2, '0')).join(':')
+}
+
+const formatRestDuration = (seconds: number) => {
+  const safeSeconds = Math.max(0, Math.floor(seconds))
+  const hours = Math.floor(safeSeconds / 3600)
+  const minutes = Math.floor((safeSeconds % 3600) / 60)
+  const rest = safeSeconds % 60
+
+  if (hours > 0) {
+    return [hours, minutes, rest].map((part) => String(part).padStart(2, '0')).join(':')
+  }
+
+  return `${String(minutes).padStart(2, '0')}:${String(rest).padStart(2, '0')}`
 }
 
 const normalizeName = (value: string) => value.trim().toLocaleLowerCase('es-MX')
@@ -311,6 +327,38 @@ const emptyCardio = (): CardioSession => ({
   completed: false,
 })
 
+const getPreviousExercise = (previousWorkout: Workout | undefined, exerciseName: string, exerciseIndex: number) => {
+  const previousExerciseAtIndex = previousWorkout?.exercises[exerciseIndex]
+  const normalizedExerciseName = normalizeName(exerciseName)
+
+  if (previousExerciseAtIndex && normalizeName(previousExerciseAtIndex.name) === normalizedExerciseName) {
+    return previousExerciseAtIndex
+  }
+
+  return previousWorkout?.exercises.find((exercise) => normalizeName(exercise.name) === normalizedExerciseName)
+}
+
+const fillSetFromPreviousWorkout = (
+  set: TrainingExercise['sets'][number],
+  exerciseName: string,
+  exerciseIndex: number,
+  previousWorkout: Workout | undefined,
+) => {
+  const previousSet = getPreviousExercise(previousWorkout, exerciseName, exerciseIndex)?.sets.find(
+    (item) => item.setNumber === set.setNumber,
+  )
+
+  if (!previousSet) {
+    return set
+  }
+
+  return {
+    ...set,
+    weight: set.weight === null ? previousSet.weight : set.weight,
+    reps: set.reps === null ? previousSet.reps : set.reps,
+  }
+}
+
 const hasCardioEntry = (cardio?: CardioSession) =>
   Boolean(cardio && (cardio.completed || cardio.incline !== null || cardio.speed !== null || cardio.durationMinutes !== null))
 
@@ -458,7 +506,7 @@ function App() {
   const [syncStatus, setSyncStatus] = useState<'local' | 'loading' | 'synced' | 'sent' | 'error'>('local')
   const [syncCooldown, setSyncCooldown] = useState(0)
   const [activeTab, setActiveTabState] = useState<TabKey>(() => tabFromHash())
-  const [trainingPhrase] = useState(() => trainingPhrases[Math.floor(Math.random() * trainingPhrases.length)])
+  const [trainingPhraseIndex, setTrainingPhraseIndex] = useState(() => Math.floor(Math.random() * trainingPhrases.length))
   const [theme, setTheme] = useState<ThemeMode>(() => {
     const storedTheme = localStorage.getItem('goy-theme')
     if (storedTheme === 'dark' || storedTheme === 'light') {
@@ -477,6 +525,9 @@ function App() {
   const [selectedHistoryId, setSelectedHistoryId] = useState('')
   const [editingWorkoutId, setEditingWorkoutId] = useState('')
   const [now, setNow] = useState(() => Date.now())
+  const [restTimerSeconds, setRestTimerSeconds] = useState(0)
+  const [isRestTimerRunning, setIsRestTimerRunning] = useState(false)
+  const [isRestTimerOpen, setIsRestTimerOpen] = useState(false)
   const [isAddingCheckIn, setIsAddingCheckIn] = useState(false)
   const [editingCheckInId, setEditingCheckInId] = useState('')
   const [checkInDraft, setCheckInDraft] = useState({
@@ -484,6 +535,8 @@ function App() {
     photo: '',
   })
   const [routineDraft, setRoutineDraft] = useState<RoutineDraft>(() => routineToDraft())
+  const activeWorkoutId = state.activeWorkout?.id
+  const trainingPhrase = trainingPhrases[trainingPhraseIndex]
 
   const applyLoadedState = useCallback((savedState: AppState) => {
     stateRef.current = savedState
@@ -671,13 +724,22 @@ function App() {
   }, [isLoaded, session, state])
 
   useEffect(() => {
-    if (!state.activeWorkout) {
+    if (!activeWorkoutId) {
       return
     }
 
     const interval = window.setInterval(() => setNow(Date.now()), 1000)
     return () => window.clearInterval(interval)
-  }, [state.activeWorkout])
+  }, [activeWorkoutId])
+
+  useEffect(() => {
+    if (!activeWorkoutId || !isRestTimerRunning) {
+      return
+    }
+
+    const interval = window.setInterval(() => setRestTimerSeconds((seconds) => seconds + 1), 1000)
+    return () => window.clearInterval(interval)
+  }, [activeWorkoutId, isRestTimerRunning])
 
   useEffect(() => {
     if (syncCooldown <= 0) {
@@ -687,6 +749,18 @@ function App() {
     const interval = window.setInterval(() => setSyncCooldown((seconds) => Math.max(0, seconds - 1)), 1000)
     return () => window.clearInterval(interval)
   }, [syncCooldown])
+
+  useEffect(() => {
+    if (activeTab !== 'training' || trainingMode !== 'home' || activeWorkoutId) {
+      return
+    }
+
+    const interval = window.setInterval(() => {
+      setTrainingPhraseIndex((index) => (index + 1) % trainingPhrases.length)
+    }, 5200)
+
+    return () => window.clearInterval(interval)
+  }, [activeTab, activeWorkoutId, trainingMode])
 
   const sortedCheckIns = useMemo(
     () => [...state.checkIns].sort((a, b) => a.date.localeCompare(b.date)),
@@ -949,6 +1023,9 @@ function App() {
     }
 
     setNow(Date.now())
+    setRestTimerSeconds(0)
+    setIsRestTimerRunning(false)
+    setIsRestTimerOpen(false)
     setTrainingMode('home')
     setState((current) => ({ ...current, activeWorkout: workout }))
     vibrate(20)
@@ -969,18 +1046,26 @@ function App() {
         ...current,
         activeWorkout: {
           ...current.activeWorkout,
-          exercises: current.activeWorkout.exercises.map((exercise) =>
+          exercises: current.activeWorkout.exercises.map((exercise, exerciseIndex) =>
             exercise.id === exerciseId
               ? {
                   ...exercise,
-                  sets: exercise.sets.map((set) =>
-                    set.id === setId
-                      ? {
-                          ...set,
-                          [field]: value,
-                        }
-                      : set,
-                  ),
+                  sets: exercise.sets.map((set) => {
+                    if (set.id !== setId) {
+                      return set
+                    }
+
+                    const updatedSet = {
+                      ...set,
+                      weight: field === 'weight' ? (value as number | null) : set.weight,
+                      reps: field === 'reps' ? (value as number | null) : set.reps,
+                      completed: field === 'completed' ? Boolean(value) : set.completed,
+                    }
+
+                    return field === 'completed' && value === true
+                      ? fillSetFromPreviousWorkout(updatedSet, exercise.name, exerciseIndex, previousWorkoutForActive)
+                      : updatedSet
+                  }),
                 }
               : exercise,
           ),
@@ -1014,8 +1099,15 @@ function App() {
     }
 
     const endedAt = new Date().toISOString()
+    const exercises = state.activeWorkout.exercises.map((exercise, exerciseIndex) => ({
+      ...exercise,
+      sets: exercise.sets.map((set) =>
+        set.completed ? fillSetFromPreviousWorkout(set, exercise.name, exerciseIndex, previousWorkoutForActive) : set,
+      ),
+    }))
     const workout: Workout = {
       ...state.activeWorkout,
+      exercises,
       cardio: state.activeWorkout.cardio ?? emptyCardio(),
       endedAt,
       durationSeconds: Math.max(
@@ -1029,6 +1121,9 @@ function App() {
       activeWorkout: undefined,
       workouts: [workout, ...current.workouts],
     }))
+    setRestTimerSeconds(0)
+    setIsRestTimerRunning(false)
+    setIsRestTimerOpen(false)
     setSelectedHistoryId(workout.id)
     setActiveTab('history')
     vibrate([18, 30, 22])
@@ -1045,6 +1140,27 @@ function App() {
         </button>
 
         <div className="header-actions">
+          {state.activeWorkout && (
+            <RestTimer
+              isOpen={isRestTimerOpen}
+              isRunning={isRestTimerRunning}
+              seconds={restTimerSeconds}
+              adjust={(delta) => {
+                setRestTimerSeconds((seconds) => Math.max(0, seconds + delta))
+                vibrate(6)
+              }}
+              reset={() => {
+                setRestTimerSeconds(0)
+                setIsRestTimerRunning(false)
+                vibrate(8)
+              }}
+              setIsOpen={setIsRestTimerOpen}
+              toggle={() => {
+                setIsRestTimerRunning((running) => !running)
+                vibrate(8)
+              }}
+            />
+          )}
           {session && (
             <button
               aria-label="Cuenta registrada. Tocar para salir"
@@ -1200,6 +1316,71 @@ function App() {
         )}
 
       </main>
+    </div>
+  )
+}
+
+function RestTimer({
+  adjust,
+  isOpen,
+  isRunning,
+  reset,
+  seconds,
+  setIsOpen,
+  toggle,
+}: {
+  adjust: (delta: number) => void
+  isOpen: boolean
+  isRunning: boolean
+  reset: () => void
+  seconds: number
+  setIsOpen: Dispatch<SetStateAction<boolean>>
+  toggle: () => void
+}) {
+  return (
+    <div className="rest-timer">
+      <button
+        aria-expanded={isOpen}
+        aria-label="Cronometro de descanso"
+        className={isOpen || isRunning ? 'rest-timer-button active' : 'rest-timer-button'}
+        data-tooltip="Descanso"
+        type="button"
+        onClick={() => {
+          setIsOpen((open) => !open)
+          vibrate(6)
+        }}
+      >
+        <Timer size={17} />
+        <span>{formatRestDuration(seconds)}</span>
+      </button>
+
+      {isOpen && (
+        <div className="rest-timer-popover">
+          <span>Descanso</span>
+          <strong>{formatRestDuration(seconds)}</strong>
+          <div className="rest-timer-controls">
+            <button aria-label="Restar 15 segundos" className="icon-button flat" type="button" onClick={() => adjust(-15)}>
+              <Minus size={17} />
+              <small>15</small>
+            </button>
+            <button aria-label="Reiniciar descanso" className="icon-button flat" type="button" onClick={reset}>
+              <RotateCcw size={17} />
+            </button>
+            <button
+              aria-label={isRunning ? 'Pausar descanso' : 'Reanudar descanso'}
+              className="rest-timer-main"
+              type="button"
+              onClick={toggle}
+            >
+              {isRunning ? <Pause size={18} /> : <Play size={18} />}
+            </button>
+            <button aria-label="Agregar 15 segundos" className="icon-button flat" type="button" onClick={() => adjust(15)}>
+              <Plus size={17} />
+              <small>15</small>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -1613,7 +1794,9 @@ function TrainingView({
 
   return (
     <section className="training-home enter">
-      <h1 className="training-phrase">{trainingPhrase}</h1>
+      <h1 className="training-phrase" key={trainingPhrase}>
+        {trainingPhrase}
+      </h1>
       <div className="surface start-card">
         {routines.length ? (
           <>
@@ -1978,7 +2161,7 @@ function WorkoutDetail({
             <div className="detail-sets">
               {exercise.sets.map((set) => (
                 <span key={set.id}>
-                  {set.setNumber}. {formatNumber(set.weight ?? 0)} kg · {set.reps ?? 0} reps
+                  {set.setNumber}. {set.weight === null ? '--' : formatNumber(set.weight)} kg · {set.reps ?? '--'} reps
                 </span>
               ))}
             </div>
