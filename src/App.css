@@ -286,6 +286,11 @@ html:not([data-theme='dark']) .brand-mark img {
   backdrop-filter: blur(14px);
 }
 
+.completion-banner.leaving {
+  pointer-events: none;
+  animation: completionOut 400ms ease forwards;
+}
+
 .completion-banner > div:not(.streak-flame) {
   display: grid;
   min-width: 0;
@@ -1454,6 +1459,17 @@ button:not(:disabled):active {
   }
   50% {
     transform: scale(1.06);
+  }
+}
+
+@keyframes completionOut {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.985);
   }
 }
 

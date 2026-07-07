@@ -541,6 +541,7 @@ function App() {
   const [syncCooldown, setSyncCooldown] = useState(0)
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(() => hasPasswordRecoveryParams())
   const [finishSummary, setFinishSummary] = useState<FinishSummary | null>(null)
+  const [isFinishSummaryLeaving, setIsFinishSummaryLeaving] = useState(false)
   const [isWorkoutStarting, setIsWorkoutStarting] = useState(false)
   const [activeTab, setActiveTabState] = useState<TabKey>(() => tabFromHash())
   const [trainingPhraseIndex, setTrainingPhraseIndex] = useState(() => Math.floor(Math.random() * trainingPhrases.length))
@@ -798,6 +799,23 @@ function App() {
     const timeout = window.setTimeout(() => setIsWorkoutStarting(false), 900)
     return () => window.clearTimeout(timeout)
   }, [isWorkoutStarting])
+
+  useEffect(() => {
+    if (!finishSummary) {
+      return
+    }
+
+    const leaveTimeout = window.setTimeout(() => setIsFinishSummaryLeaving(true), 4600)
+    const removeTimeout = window.setTimeout(() => {
+      setFinishSummary(null)
+      setIsFinishSummaryLeaving(false)
+    }, 5000)
+
+    return () => {
+      window.clearTimeout(leaveTimeout)
+      window.clearTimeout(removeTimeout)
+    }
+  }, [finishSummary])
 
   useEffect(() => {
     if (activeTab !== 'training' || trainingMode !== 'home' || activeWorkoutId) {
@@ -1228,6 +1246,7 @@ function App() {
     const streak = getFlexibleTrainingStreak(workouts, getWorkoutStartDate(workout))
     const message = completionMessages[Math.floor(Math.random() * completionMessages.length)]
 
+    setIsFinishSummaryLeaving(false)
     setFinishSummary({ id: workout.id, message, streak })
     setState((current) => ({
       ...current,
@@ -1339,12 +1358,12 @@ function App() {
 
       <main className={mainClassName}>
         <SyncPanel
-            email={syncEmail}
-            isConfigured={isSupabaseConfigured}
-            isPasswordRecovery={isPasswordRecovery}
-            message={syncMessage}
-            password={syncPassword}
-            session={session}
+          email={syncEmail}
+          isConfigured={isSupabaseConfigured}
+          isPasswordRecovery={isPasswordRecovery}
+          message={syncMessage}
+          password={syncPassword}
+          session={session}
           setEmail={setSyncEmail}
           setPassword={setSyncPassword}
           status={syncStatus}
@@ -1352,7 +1371,19 @@ function App() {
           syncCooldown={syncCooldown}
         />
 
-        {finishSummary && <CompletionBanner summary={finishSummary} onDismiss={() => setFinishSummary(null)} />}
+        {finishSummary && (
+          <CompletionBanner
+            isLeaving={isFinishSummaryLeaving}
+            summary={finishSummary}
+            onDismiss={() => {
+              setIsFinishSummaryLeaving(true)
+              window.setTimeout(() => {
+                setFinishSummary(null)
+                setIsFinishSummaryLeaving(false)
+              }, 360)
+            }}
+          />
+        )}
 
         {activeTab === 'training' && (
           <TrainingView
@@ -1890,11 +1921,19 @@ function TrainingView({
   )
 }
 
-function CompletionBanner({ onDismiss, summary }: { onDismiss: () => void; summary: FinishSummary }) {
+function CompletionBanner({
+  isLeaving,
+  onDismiss,
+  summary,
+}: {
+  isLeaving: boolean
+  onDismiss: () => void
+  summary: FinishSummary
+}) {
   const fireLevel = getFireLevel(summary.streak)
 
   return (
-    <section className="completion-banner enter" key={summary.id}>
+    <section className={isLeaving ? 'completion-banner leaving' : 'completion-banner enter'} key={summary.id}>
       <div className={`streak-flame level-${fireLevel}`} aria-hidden="true">
         <Flame size={23} />
       </div>
