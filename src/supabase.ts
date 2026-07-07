@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import type { Session } from '@supabase/supabase-js'
+import type { AuthChangeEvent, Session } from '@supabase/supabase-js'
 import { initialState } from './sampleData'
 import { normalizeState } from './storage'
 import type { AppState } from './types'
@@ -68,6 +68,7 @@ export const supabase = (() => {
 export const isSupabaseConfigured = Boolean(supabase)
 
 export type SyncSession = Session
+export type SyncAuthEvent = AuthChangeEvent
 
 export const getSession = async () => {
   if (!supabase) {
@@ -82,14 +83,14 @@ export const getSession = async () => {
   return data.session
 }
 
-export const onAuthChange = (callback: (session: Session | null) => void) => {
+export const onAuthChange = (callback: (session: Session | null, event: AuthChangeEvent) => void) => {
   if (!supabase) {
     return () => undefined
   }
 
   const {
     data: { subscription },
-  } = supabase.auth.onAuthStateChange((_event, session) => callback(session))
+  } = supabase.auth.onAuthStateChange((event, session) => callback(session, event))
 
   return () => subscription.unsubscribe()
 }
@@ -124,6 +125,31 @@ export const signUpWithEmail = async (email: string, password: string) => {
 
   if (signUpError) {
     throw new Error(getSupabaseErrorMessage(signUpError))
+  }
+}
+
+export const requestPasswordReset = async (email: string) => {
+  if (!supabase) {
+    throw new Error('Supabase is not configured')
+  }
+
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: getAuthRedirectUrl(),
+  })
+
+  if (error) {
+    throw new Error(getSupabaseErrorMessage(error))
+  }
+}
+
+export const updatePassword = async (password: string) => {
+  if (!supabase) {
+    throw new Error('Supabase is not configured')
+  }
+
+  const { error } = await supabase.auth.updateUser({ password })
+  if (error) {
+    throw new Error(getSupabaseErrorMessage(error))
   }
 }
 

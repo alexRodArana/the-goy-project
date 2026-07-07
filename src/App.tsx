@@ -22,16 +22,15 @@ import {
   ChevronRight,
   Cloud,
   Dumbbell,
+  Flame,
   History,
+  KeyRound,
   Mail,
-  Minus,
   Moon,
   Palette,
-  Pause,
   Pencil,
   Play,
   Plus,
-  RotateCcw,
   Save,
   Sun,
   Timer,
@@ -47,10 +46,12 @@ import {
   isSupabaseConfigured,
   loadRemoteState,
   onAuthChange,
+  requestPasswordReset,
   saveRemoteState,
   signInWithEmail,
   signOut,
   signUpWithEmail,
+  updatePassword,
   type SyncSession,
 } from './supabase'
 import type {
@@ -74,22 +75,6 @@ type AccentOption = {
   key: AccentColor
   label: string
   color: string
-}
-
-type NotificationState = NotificationPermission | 'unsupported'
-
-type ScreenWakeLockSentinel = {
-  release: () => Promise<void>
-  addEventListener?: (type: 'release', listener: EventListener) => void
-  removeEventListener?: (type: 'release', listener: EventListener) => void
-}
-
-type EnhancedNavigator = Navigator & {
-  wakeLock?: {
-    request: (type: 'screen') => Promise<ScreenWakeLockSentinel>
-  }
-  setAppBadge?: (contents?: number) => Promise<void>
-  clearAppBadge?: () => Promise<void>
 }
 
 type CalendarDay = {
@@ -131,6 +116,12 @@ type CheckInDraft = {
   date: string
   weight: number
   photo: string
+}
+
+type FinishSummary = {
+  id: string
+  message: string
+  streak: number
 }
 
 const toDateKey = (date: Date) =>
@@ -184,19 +175,6 @@ const formatDuration = (seconds: number) => {
   return [hours, minutes, rest].map((part) => String(part).padStart(2, '0')).join(':')
 }
 
-const formatRestDuration = (seconds: number) => {
-  const safeSeconds = Math.max(0, Math.floor(seconds))
-  const hours = Math.floor(safeSeconds / 3600)
-  const minutes = Math.floor((safeSeconds % 3600) / 60)
-  const rest = safeSeconds % 60
-
-  if (hours > 0) {
-    return [hours, minutes, rest].map((part) => String(part).padStart(2, '0')).join(':')
-  }
-
-  return `${String(minutes).padStart(2, '0')}:${String(rest).padStart(2, '0')}`
-}
-
 const normalizeName = (value: string) => value.trim().toLocaleLowerCase('es-MX')
 
 const addMonths = (monthKey: string, offset: number) => {
@@ -208,6 +186,34 @@ const addMonths = (monthKey: string, offset: number) => {
 const formatMonthKey = (monthKey: string) => formatMonth(`${monthKey}-01`)
 
 const wait = (milliseconds: number) => new Promise((resolve) => window.setTimeout(resolve, milliseconds))
+
+const dayDifference = (laterDate: string, earlierDate: string) =>
+  Math.round((toLocalDate(laterDate).getTime() - toLocalDate(earlierDate).getTime()) / 86_400_000)
+
+const completionMessages = ['Bien hecho.', 'Buen trabajo.', 'Rutina completada.', 'Trabajo limpio.', 'Entreno cerrado.']
+
+const getFlexibleTrainingStreak = (workouts: Workout[], referenceDate = todayIso()) => {
+  const dates = [...new Set(workouts.map(getWorkoutStartDate).filter((date) => date <= referenceDate))].sort((a, b) =>
+    b.localeCompare(a),
+  )
+
+  const latestDate = dates[0]
+  if (!latestDate || dayDifference(referenceDate, latestDate) > 3) {
+    return 0
+  }
+
+  let streak = 1
+  for (let index = 1; index < dates.length; index += 1) {
+    if (dayDifference(dates[index - 1], dates[index]) > 3) {
+      break
+    }
+    streak += 1
+  }
+
+  return streak
+}
+
+const getFireLevel = (streak: number) => (streak <= 0 ? 0 : Math.min(5, Math.max(1, Math.ceil(streak / 3))))
 
 const selectInputValue = (event: ReactFocusEvent<HTMLInputElement>) => {
   const input = event.currentTarget
@@ -241,10 +247,6 @@ const accentOptions: AccentOption[] = [
   { key: 'rose', label: 'Rosa', color: '#be185d' },
 ]
 
-const APP_TITLE = 'The Goy Project'
-const DEFAULT_REST_SECONDS = 90
-const REST_PRESETS = [60, 90, 120]
-
 const trainingPhrases = [
   'Goy mode off, disciplina Judia on.',
   'Del Goy al modo Kosher, una serie a la vez.',
@@ -259,6 +261,17 @@ const trainingPhrases = [
 const tabFromHash = (): TabKey => {
   const key = window.location.hash.replace('#', '')
   return navItems.some((item) => item.key === key) ? (key as TabKey) : 'training'
+}
+
+const hasPasswordRecoveryParams = () => {
+  const params = new URLSearchParams(`${window.location.search.slice(1)}&${window.location.hash.replace(/^#/, '')}`)
+  return params.get('type') === 'recovery'
+}
+
+const clearPasswordRecoveryUrl = () => {
+  if (hasPasswordRecoveryParams()) {
+    window.history.replaceState(null, '', window.location.pathname)
+  }
 }
 
 const createRoutineExercise = (name = ''): RoutineDraftExercise => ({
@@ -385,55 +398,6 @@ const hasCardioEntry = (cardio?: CardioSession) =>
 
 const formatCardioNumber = (value: number | null | undefined, suffix: string) =>
   value === null || value === undefined ? '--' : `${formatNumber(value)} ${suffix}`
-
-const getNotificationState = (): NotificationState => {
-  if (!('Notification' in window)) {
-    return 'unsupported'
-  }
-
-  return Notification.permission
-}
-
-const playRestCompleteSound = () => {
-  try {
-    const AudioContextConstructor =
-      window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
-    if (!AudioContextConstructor) {
-      return
-    }
-
-    const audioContext = new AudioContextConstructor()
-    const oscillator = audioContext.createOscillator()
-    const gain = audioContext.createGain()
-
-    oscillator.type = 'sine'
-    oscillator.frequency.setValueAtTime(880, audioContext.currentTime)
-    oscillator.frequency.setValueAtTime(660, audioContext.currentTime + 0.14)
-    gain.gain.setValueAtTime(0.001, audioContext.currentTime)
-    gain.gain.exponentialRampToValueAtTime(0.18, audioContext.currentTime + 0.02)
-    gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.45)
-    oscillator.connect(gain)
-    gain.connect(audioContext.destination)
-    oscillator.start()
-    oscillator.stop(audioContext.currentTime + 0.48)
-  } catch {
-    // Audio feedback is best-effort and may be blocked by the platform.
-  }
-}
-
-const setRestTimerBadge = () => {
-  const request = (navigator as EnhancedNavigator).setAppBadge?.(1)
-  if (request) {
-    void request.catch(() => undefined)
-  }
-}
-
-const clearRestTimerBadge = () => {
-  const request = (navigator as EnhancedNavigator).clearAppBadge?.()
-  if (request) {
-    void request.catch(() => undefined)
-  }
-}
 
 const hasUserData = (value: AppState) =>
   Boolean(value.checkIns.length || value.routines.length || value.workouts.length || value.activeWorkout)
@@ -568,8 +532,6 @@ function App() {
   const authHydrationRef = useRef(0)
   const initialAuthHandledRef = useRef(false)
   const isHydratingRef = useRef(false)
-  const restTimerAlertedRef = useRef(false)
-  const wakeLockRef = useRef<ScreenWakeLockSentinel | null>(null)
   const [isLoaded, setIsLoaded] = useState(false)
   const [session, setSession] = useState<SyncSession | null>(null)
   const [syncEmail, setSyncEmail] = useState('')
@@ -577,6 +539,9 @@ function App() {
   const [syncMessage, setSyncMessage] = useState('')
   const [syncStatus, setSyncStatus] = useState<'local' | 'loading' | 'synced' | 'sent' | 'error'>('local')
   const [syncCooldown, setSyncCooldown] = useState(0)
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(() => hasPasswordRecoveryParams())
+  const [finishSummary, setFinishSummary] = useState<FinishSummary | null>(null)
+  const [isWorkoutStarting, setIsWorkoutStarting] = useState(false)
   const [activeTab, setActiveTabState] = useState<TabKey>(() => tabFromHash())
   const [trainingPhraseIndex, setTrainingPhraseIndex] = useState(() => Math.floor(Math.random() * trainingPhrases.length))
   const [theme, setTheme] = useState<ThemeMode>(() => {
@@ -597,10 +562,6 @@ function App() {
   const [selectedHistoryId, setSelectedHistoryId] = useState('')
   const [editingWorkoutId, setEditingWorkoutId] = useState('')
   const [now, setNow] = useState(() => Date.now())
-  const [restTimerSeconds, setRestTimerSeconds] = useState(DEFAULT_REST_SECONDS)
-  const [isRestTimerRunning, setIsRestTimerRunning] = useState(false)
-  const [isRestTimerOpen, setIsRestTimerOpen] = useState(false)
-  const [notificationPermission, setNotificationPermission] = useState<NotificationState>(() => getNotificationState())
   const [isAddingCheckIn, setIsAddingCheckIn] = useState(false)
   const [editingCheckInId, setEditingCheckInId] = useState('')
   const [checkInDraft, setCheckInDraft] = useState({
@@ -685,7 +646,13 @@ function App() {
             return
           }
 
-          if (currentSession) {
+          if (currentSession && hasPasswordRecoveryParams()) {
+            setSession(currentSession)
+            setIsPasswordRecovery(true)
+            setSyncPassword('')
+            setSyncStatus('local')
+            setSyncMessage('Escribe tu nueva contraseña.')
+          } else if (currentSession) {
             await hydrateSessionState(currentSession, localState)
           } else {
             setSession(null)
@@ -714,7 +681,7 @@ function App() {
 
     loadInitialState()
 
-    const unsubscribe = onAuthChange(async (nextSession) => {
+    const unsubscribe = onAuthChange(async (nextSession, event) => {
       if (!initialAuthHandledRef.current) {
         return
       }
@@ -724,12 +691,21 @@ function App() {
         isHydratingRef.current = false
         setSession(null)
         setSyncStatus('local')
+        setIsPasswordRecovery(false)
         return
       }
 
       try {
         const localState = stateRef.current
         if (!mounted) {
+          return
+        }
+        if (event === 'PASSWORD_RECOVERY') {
+          setSession(nextSession)
+          setIsPasswordRecovery(true)
+          setSyncPassword('')
+          setSyncStatus('local')
+          setSyncMessage('Escribe tu nueva contraseña.')
           return
         }
         await hydrateSessionState(nextSession, localState)
@@ -815,6 +791,15 @@ function App() {
   }, [syncCooldown])
 
   useEffect(() => {
+    if (!isWorkoutStarting) {
+      return
+    }
+
+    const timeout = window.setTimeout(() => setIsWorkoutStarting(false), 900)
+    return () => window.clearTimeout(timeout)
+  }, [isWorkoutStarting])
+
+  useEffect(() => {
     if (activeTab !== 'training' || trainingMode !== 'home' || activeWorkoutId) {
       return
     }
@@ -854,165 +839,9 @@ function App() {
       (workout) => workout.routineId === activeRoutineId || normalizeName(workout.routineName) === normalizedRoutineName,
     )
   }, [activeRoutineId, activeRoutineName, sortedWorkouts])
-  const restTimerContext = useMemo(() => {
-    if (!state.activeWorkout) {
-      return ''
-    }
-
-    for (const exercise of state.activeWorkout.exercises) {
-      const nextSet = exercise.sets.find((set) => !set.completed)
-      if (nextSet) {
-        return `${exercise.name} · serie ${nextSet.setNumber}`
-      }
-    }
-
-    return 'Entrenamiento completo'
-  }, [state.activeWorkout])
   const isTrainingFocus = activeTab === 'training' && Boolean(state.activeWorkout || trainingMode !== 'home')
   const mainClassName = ['main', `main-${activeTab}`, isTrainingFocus ? 'main-focus' : ''].filter(Boolean).join(' ')
   const currentAccent = accentOptions.find((option) => option.key === accent) ?? accentOptions[0]
-  const shouldKeepScreenAwake = Boolean(activeWorkoutId && isRestTimerRunning && restTimerSeconds > 0)
-
-  const releaseWakeLock = useCallback(() => {
-    const wakeLock = wakeLockRef.current
-    if (!wakeLock) {
-      return
-    }
-
-    wakeLockRef.current = null
-    void wakeLock.release().catch(() => undefined)
-  }, [])
-
-  const requestWakeLock = useCallback(async () => {
-    const wakeLockApi = (navigator as EnhancedNavigator).wakeLock
-    if (wakeLockRef.current || !wakeLockApi || document.visibilityState !== 'visible') {
-      return
-    }
-
-    try {
-      const wakeLock = await wakeLockApi.request('screen')
-      const handleRelease = () => {
-        if (wakeLockRef.current === wakeLock) {
-          wakeLockRef.current = null
-        }
-        wakeLock.removeEventListener?.('release', handleRelease)
-      }
-
-      wakeLock.addEventListener?.('release', handleRelease)
-      wakeLockRef.current = wakeLock
-    } catch {
-      // Wake Lock is progressive enhancement and may be unavailable on the device.
-    }
-  }, [])
-
-  const requestNotificationPermission = useCallback(async () => {
-    if (!('Notification' in window)) {
-      setNotificationPermission('unsupported')
-      return
-    }
-
-    const permission = await Notification.requestPermission()
-    setNotificationPermission(permission)
-    if (permission === 'granted') {
-      vibrate(8)
-    }
-  }, [])
-
-  const notifyRestTimerComplete = useCallback(async () => {
-    setRestTimerBadge()
-    vibrate([160, 80, 160, 80, 260])
-    playRestCompleteSound()
-
-    if (getNotificationState() !== 'granted') {
-      setNotificationPermission(getNotificationState())
-      return
-    }
-
-    const title = 'Descanso terminado'
-    const options: NotificationOptions = {
-      body: restTimerContext ? `Siguiente: ${restTimerContext}` : 'Vuelve a la rutina.',
-      badge: `${import.meta.env.BASE_URL}app-icon-192.png`,
-      icon: `${import.meta.env.BASE_URL}app-icon-192.png`,
-      tag: 'the-goy-rest-timer',
-    }
-
-    try {
-      const registration = 'serviceWorker' in navigator ? await navigator.serviceWorker.getRegistration() : undefined
-      if (registration) {
-        await registration.showNotification(title, options)
-      } else {
-        new Notification(title, options)
-      }
-    } catch (error) {
-      console.error('Could not show rest timer notification', error)
-    }
-  }, [restTimerContext])
-
-  useEffect(() => {
-    if (!activeWorkoutId || !isRestTimerRunning) {
-      return
-    }
-
-    const interval = window.setInterval(() => {
-      setRestTimerSeconds((seconds) => {
-        if (seconds <= 1) {
-          if (!restTimerAlertedRef.current) {
-            restTimerAlertedRef.current = true
-            window.setTimeout(() => {
-              setIsRestTimerRunning(false)
-              void notifyRestTimerComplete()
-            }, 0)
-          }
-          return 0
-        }
-
-        return seconds - 1
-      })
-    }, 1000)
-
-    return () => window.clearInterval(interval)
-  }, [activeWorkoutId, isRestTimerRunning, notifyRestTimerComplete])
-
-  useEffect(() => {
-    if (!shouldKeepScreenAwake) {
-      releaseWakeLock()
-      return
-    }
-
-    void requestWakeLock()
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        void requestWakeLock()
-      }
-    }
-
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-      releaseWakeLock()
-    }
-  }, [releaseWakeLock, requestWakeLock, shouldKeepScreenAwake])
-
-  useEffect(() => {
-    if (!activeWorkoutId) {
-      document.title = APP_TITLE
-      clearRestTimerBadge()
-      return
-    }
-
-    if (restTimerSeconds === 0 && restTimerAlertedRef.current) {
-      document.title = `Descanso listo - ${APP_TITLE}`
-      return
-    }
-
-    if (isRestTimerRunning) {
-      document.title = `${formatRestDuration(restTimerSeconds)} descanso - ${APP_TITLE}`
-      return
-    }
-
-    document.title = `${state.activeWorkout?.routineName ?? 'Training'} - ${formatDuration(elapsedSeconds)}`
-  }, [activeWorkoutId, elapsedSeconds, isRestTimerRunning, restTimerSeconds, state.activeWorkout?.routineName])
 
   const setActiveTab = (tab: TabKey) => {
     if (tab !== activeTab) {
@@ -1047,22 +876,82 @@ function App() {
 
   const requestSyncLink = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (!syncEmail.trim() || !syncPassword || syncCooldown > 0) {
+    if (syncCooldown > 0) {
       return
     }
 
     const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null
-    const intent = submitter?.value === 'signup' ? 'signup' : 'signin'
+    const intent = submitter?.value ?? 'signin'
+
+    if (intent === 'reset') {
+      if (!syncEmail.trim()) {
+        setSyncStatus('error')
+        setSyncMessage('Escribe el correo de tu cuenta.')
+        return
+      }
+
+      try {
+        setSyncStatus('loading')
+        await requestPasswordReset(syncEmail.trim())
+        setSyncStatus('sent')
+        setSyncCooldown(60)
+        setSyncMessage('Si el correo existe, recibiras un link para recuperar tu contraseña.')
+      } catch (error) {
+        console.error('Could not request password reset', error)
+        setSyncStatus('error')
+        const errorMessage = error instanceof Error ? error.message : 'No se pudo enviar el correo.'
+        setSyncMessage(errorMessage.toLowerCase().includes('rate limit') ? 'Espera 60 segundos antes de intentar otra vez.' : errorMessage)
+        if (errorMessage.toLowerCase().includes('rate limit')) {
+          setSyncCooldown(60)
+        }
+      }
+      return
+    }
+
+    if (intent === 'password') {
+      if (!syncPassword || syncPassword.length < 6) {
+        setSyncStatus('error')
+        setSyncMessage('La contraseña debe tener al menos 6 caracteres.')
+        return
+      }
+
+      try {
+        setSyncStatus('loading')
+        await updatePassword(syncPassword)
+        const currentSession = await getSession()
+        if (currentSession) {
+          await hydrateSessionState(currentSession, stateRef.current)
+        }
+        setIsPasswordRecovery(false)
+        setSyncPassword('')
+        setSyncStatus('synced')
+        setSyncMessage('Contraseña actualizada.')
+        clearPasswordRecoveryUrl()
+      } catch (error) {
+        console.error('Could not update password', error)
+        setSyncStatus('error')
+        setSyncMessage(error instanceof Error ? error.message : 'No se pudo actualizar la contraseña.')
+      }
+      return
+    }
+
+    if (!syncEmail.trim() || !syncPassword) {
+      setSyncStatus('error')
+      setSyncMessage('Escribe correo y contraseña.')
+      return
+    }
+
+    const authIntent = intent === 'signup' ? 'signup' : 'signin'
 
     try {
       setSyncStatus('loading')
-      if (intent === 'signup') {
+      if (authIntent === 'signup') {
         await signUpWithEmail(syncEmail.trim(), syncPassword)
       } else {
         await signInWithEmail(syncEmail.trim(), syncPassword)
       }
       setSyncStatus('sent')
-      setSyncMessage(intent === 'signup' ? 'Cuenta creada.' : '')
+      setSyncMessage(authIntent === 'signup' ? 'Cuenta creada.' : '')
     } catch (error) {
       console.error('Could not authenticate with Supabase', error)
       setSyncStatus('error')
@@ -1243,11 +1132,8 @@ function App() {
     }
 
     setNow(Date.now())
-    restTimerAlertedRef.current = false
-    clearRestTimerBadge()
-    setRestTimerSeconds(DEFAULT_REST_SECONDS)
-    setIsRestTimerRunning(false)
-    setIsRestTimerOpen(false)
+    setFinishSummary(null)
+    setIsWorkoutStarting(true)
     setTrainingMode('home')
     setState((current) => ({ ...current, activeWorkout: workout }))
     vibrate(20)
@@ -1338,16 +1224,17 @@ function App() {
       ),
     }
 
+    const workouts = [workout, ...state.workouts]
+    const streak = getFlexibleTrainingStreak(workouts, getWorkoutStartDate(workout))
+    const message = completionMessages[Math.floor(Math.random() * completionMessages.length)]
+
+    setFinishSummary({ id: workout.id, message, streak })
     setState((current) => ({
       ...current,
       activeWorkout: undefined,
-      workouts: [workout, ...current.workouts],
+      workouts,
     }))
-    restTimerAlertedRef.current = false
-    clearRestTimerBadge()
-    setRestTimerSeconds(DEFAULT_REST_SECONDS)
-    setIsRestTimerRunning(false)
-    setIsRestTimerOpen(false)
+    setIsWorkoutStarting(false)
     setSelectedHistoryId(workout.id)
     setActiveTab('history')
     vibrate([18, 30, 22])
@@ -1364,49 +1251,6 @@ function App() {
         </button>
 
         <div className="header-actions">
-          {state.activeWorkout && (
-            <RestTimer
-              contextLabel={restTimerContext}
-              isOpen={isRestTimerOpen}
-              isRunning={isRestTimerRunning}
-              notificationPermission={notificationPermission}
-              seconds={restTimerSeconds}
-              adjust={(delta) => {
-                restTimerAlertedRef.current = false
-                clearRestTimerBadge()
-                setRestTimerSeconds((seconds) => Math.max(0, seconds + delta))
-                vibrate(6)
-              }}
-              requestNotifications={requestNotificationPermission}
-              reset={() => {
-                restTimerAlertedRef.current = false
-                clearRestTimerBadge()
-                setRestTimerSeconds(DEFAULT_REST_SECONDS)
-                setIsRestTimerRunning(false)
-                vibrate(8)
-              }}
-              setPreset={(seconds) => {
-                restTimerAlertedRef.current = false
-                clearRestTimerBadge()
-                setRestTimerSeconds(seconds)
-                setIsRestTimerRunning(false)
-                vibrate(6)
-              }}
-              setIsOpen={setIsRestTimerOpen}
-              toggle={() => {
-                setRestTimerSeconds((seconds) => (seconds === 0 ? DEFAULT_REST_SECONDS : seconds))
-                setIsRestTimerRunning((running) => {
-                  const nextRunning = !running
-                  if (nextRunning) {
-                    restTimerAlertedRef.current = false
-                    clearRestTimerBadge()
-                  }
-                  return nextRunning
-                })
-                vibrate(8)
-              }}
-            />
-          )}
           {session && (
             <button
               aria-label="Cuenta registrada. Tocar para salir"
@@ -1495,17 +1339,20 @@ function App() {
 
       <main className={mainClassName}>
         <SyncPanel
-          email={syncEmail}
-          isConfigured={isSupabaseConfigured}
-          message={syncMessage}
-          password={syncPassword}
-          session={session}
+            email={syncEmail}
+            isConfigured={isSupabaseConfigured}
+            isPasswordRecovery={isPasswordRecovery}
+            message={syncMessage}
+            password={syncPassword}
+            session={session}
           setEmail={setSyncEmail}
           setPassword={setSyncPassword}
           status={syncStatus}
           submit={requestSyncLink}
           syncCooldown={syncCooldown}
         />
+
+        {finishSummary && <CompletionBanner summary={finishSummary} onDismiss={() => setFinishSummary(null)} />}
 
         {activeTab === 'training' && (
           <TrainingView
@@ -1523,6 +1370,7 @@ function App() {
             saveRoutine={saveRoutine}
             selectedRoutine={selectedRoutine}
             selectedRoutineId={selectedRoutineId}
+            isWorkoutStarting={isWorkoutStarting}
             trainingPhrase={trainingPhrase}
             setMode={setTrainingMode}
             setRoutineDraft={setRoutineDraft}
@@ -1566,108 +1414,6 @@ function App() {
   )
 }
 
-function RestTimer({
-  adjust,
-  contextLabel,
-  isOpen,
-  isRunning,
-  notificationPermission,
-  requestNotifications,
-  reset,
-  seconds,
-  setPreset,
-  setIsOpen,
-  toggle,
-}: {
-  adjust: (delta: number) => void
-  contextLabel: string
-  isOpen: boolean
-  isRunning: boolean
-  notificationPermission: NotificationState
-  requestNotifications: () => void
-  reset: () => void
-  seconds: number
-  setPreset: (seconds: number) => void
-  setIsOpen: Dispatch<SetStateAction<boolean>>
-  toggle: () => void
-}) {
-  const notificationLabel =
-    notificationPermission === 'granted'
-      ? 'Alertas activas'
-      : notificationPermission === 'denied'
-        ? 'Alertas bloqueadas'
-        : notificationPermission === 'unsupported'
-          ? 'Alertas no disponibles'
-          : 'Activar alertas'
-
-  return (
-    <div className="rest-timer">
-      <button
-        aria-expanded={isOpen}
-        aria-label="Cronometro de descanso"
-        className={isOpen || isRunning ? 'rest-timer-button active' : 'rest-timer-button'}
-        data-tooltip="Descanso"
-        type="button"
-        onClick={() => {
-          setIsOpen((open) => !open)
-          vibrate(6)
-        }}
-      >
-        <Timer size={17} />
-        <span>{formatRestDuration(seconds)}</span>
-      </button>
-
-      {isOpen && (
-        <div className="rest-timer-popover">
-          <span>Descanso</span>
-          <strong>{formatRestDuration(seconds)}</strong>
-          {contextLabel && <em className="rest-timer-context">{contextLabel}</em>}
-          <div className="rest-timer-presets">
-            {REST_PRESETS.map((preset) => (
-              <button
-                className={seconds === preset ? 'active' : ''}
-                key={preset}
-                type="button"
-                onClick={() => setPreset(preset)}
-              >
-                {Math.round(preset / 60)}:{String(preset % 60).padStart(2, '0')}
-              </button>
-            ))}
-          </div>
-          <div className="rest-timer-controls">
-            <button aria-label="Restar 15 segundos" className="icon-button flat" type="button" onClick={() => adjust(-15)}>
-              <Minus size={17} />
-              <small>15</small>
-            </button>
-            <button aria-label="Reiniciar descanso" className="icon-button flat" type="button" onClick={reset}>
-              <RotateCcw size={17} />
-            </button>
-            <button
-              aria-label={isRunning ? 'Pausar descanso' : 'Reanudar descanso'}
-              className="rest-timer-main"
-              type="button"
-              onClick={toggle}
-            >
-              {isRunning ? <Pause size={18} /> : <Play size={18} />}
-            </button>
-            <button aria-label="Agregar 15 segundos" className="icon-button flat" type="button" onClick={() => adjust(15)}>
-              <Plus size={17} />
-              <small>15</small>
-            </button>
-          </div>
-          {notificationPermission === 'default' ? (
-            <button className="rest-notification-button" type="button" onClick={requestNotifications}>
-              {notificationLabel}
-            </button>
-          ) : (
-            <span className={`rest-notification-status ${notificationPermission}`}>{notificationLabel}</span>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
 function TrainingView({
   activeWorkout,
   createRoutine,
@@ -1675,6 +1421,7 @@ function TrainingView({
   editSelectedRoutine,
   elapsedSeconds,
   finishWorkout,
+  isWorkoutStarting,
   mode,
   previousWorkout,
   resetRoutineDraft,
@@ -1697,6 +1444,7 @@ function TrainingView({
   editSelectedRoutine: () => void
   elapsedSeconds: number
   finishWorkout: () => void
+  isWorkoutStarting: boolean
   mode: RoutineMode
   previousWorkout?: Workout
   resetRoutineDraft: () => void
@@ -1735,7 +1483,7 @@ function TrainingView({
     const progressPercent = totalSets ? Math.round((completedSets / totalSets) * 100) : 0
 
     return (
-      <section className="focus-shell enter">
+      <section className={isWorkoutStarting ? 'focus-shell enter workout-start' : 'focus-shell enter'}>
         <div className="workout-head surface">
           <div>
             <span>{activeWorkout.routineName}</span>
@@ -2142,9 +1890,31 @@ function TrainingView({
   )
 }
 
+function CompletionBanner({ onDismiss, summary }: { onDismiss: () => void; summary: FinishSummary }) {
+  const fireLevel = getFireLevel(summary.streak)
+
+  return (
+    <section className="completion-banner enter" key={summary.id}>
+      <div className={`streak-flame level-${fireLevel}`} aria-hidden="true">
+        <Flame size={23} />
+      </div>
+      <div>
+        <strong>{summary.message}</strong>
+        <span>
+          Racha de {summary.streak} {summary.streak === 1 ? 'dia' : 'dias'}
+        </span>
+      </div>
+      <button aria-label="Cerrar mensaje" className="icon-button flat" type="button" onClick={onDismiss}>
+        <X size={17} />
+      </button>
+    </section>
+  )
+}
+
 function SyncPanel({
   email,
   isConfigured,
+  isPasswordRecovery,
   message,
   password,
   session,
@@ -2156,6 +1926,7 @@ function SyncPanel({
 }: {
   email: string
   isConfigured: boolean
+  isPasswordRecovery: boolean
   message: string
   password: string
   session: SyncSession | null
@@ -2174,8 +1945,29 @@ function SyncPanel({
     )
   }
 
-  if (session) {
+  if (session && !isPasswordRecovery) {
     return null
+  }
+
+  if (isPasswordRecovery) {
+    return (
+      <form className="sync-panel login password-recovery" onSubmit={submit}>
+        <KeyRound size={17} />
+        <input
+          aria-label="Nueva contraseña"
+          autoComplete="new-password"
+          minLength={6}
+          placeholder="nueva contraseña"
+          type="password"
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+        />
+        <button className="primary-button compact" disabled={status === 'loading'} type="submit" value="password">
+          Guardar
+        </button>
+        {message && <small>{message}</small>}
+      </form>
+    )
   }
 
   return (
@@ -2203,6 +1995,9 @@ function SyncPanel({
       </button>
       <button className="secondary-button compact" disabled={status === 'loading' || syncCooldown > 0} type="submit" value="signup">
         Crear
+      </button>
+      <button className="ghost-button compact" disabled={status === 'loading' || syncCooldown > 0} type="submit" value="reset">
+        Recuperar
       </button>
       {message && <small>{message}</small>}
     </form>

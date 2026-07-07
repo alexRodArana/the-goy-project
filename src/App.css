@@ -155,170 +155,6 @@ html:not([data-theme='dark']) .brand-mark img {
   border-color: color-mix(in srgb, var(--danger) 42%, var(--line));
 }
 
-.rest-timer {
-  position: relative;
-}
-
-.rest-timer-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  min-width: 82px;
-  min-height: 42px;
-  padding: 0 10px;
-  color: var(--ink);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 860;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  cursor: pointer;
-  transition:
-    background 160ms ease,
-    border-color 160ms ease,
-    color 160ms ease,
-    transform 160ms ease;
-}
-
-.rest-timer-button.active {
-  color: var(--brand-ink);
-  background: var(--brand-soft);
-  border-color: var(--brand-line);
-}
-
-.rest-timer-popover {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  z-index: 70;
-  display: grid;
-  gap: 10px;
-  width: min(270px, calc(100vw - 24px));
-  padding: 12px;
-  color: var(--ink);
-  background: color-mix(in srgb, var(--surface) 94%, transparent);
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  box-shadow: var(--shadow);
-  backdrop-filter: blur(18px);
-  animation: enter 140ms ease both;
-}
-
-.rest-timer-popover > span {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.rest-timer-popover > strong {
-  font-size: 34px;
-  font-weight: 920;
-  line-height: 1;
-  letter-spacing: 0;
-}
-
-.rest-timer-context {
-  display: block;
-  min-width: 0;
-  overflow: hidden;
-  color: var(--muted);
-  font-size: 12px;
-  font-style: normal;
-  font-weight: 820;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.rest-timer-presets {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
-}
-
-.rest-timer-presets button,
-.rest-notification-button,
-.rest-notification-status {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 32px;
-  padding: 0 9px;
-  color: var(--muted);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 850;
-  background: var(--field);
-  border: 1px solid var(--line);
-  border-radius: 9px;
-}
-
-.rest-timer-presets button {
-  cursor: pointer;
-}
-
-.rest-timer-presets button.active {
-  color: var(--brand-ink);
-  background: var(--brand-soft);
-  border-color: var(--brand-line);
-}
-
-.rest-notification-button {
-  width: 100%;
-  color: var(--ink);
-  cursor: pointer;
-}
-
-.rest-notification-status.granted {
-  color: var(--brand-ink);
-  background: var(--brand-soft);
-  border-color: var(--brand-line);
-}
-
-.rest-notification-status.denied,
-.rest-notification-status.unsupported {
-  color: var(--danger);
-  background: color-mix(in srgb, var(--danger) 10%, var(--surface));
-  border-color: color-mix(in srgb, var(--danger) 34%, var(--line));
-}
-
-.rest-timer-controls {
-  display: grid;
-  grid-template-columns: 44px 44px minmax(0, 1fr) 44px;
-  gap: 8px;
-}
-
-.rest-timer-controls .icon-button {
-  position: relative;
-}
-
-.rest-timer-controls small {
-  position: absolute;
-  right: 6px;
-  bottom: 5px;
-  color: var(--muted);
-  font-size: 9px;
-  font-weight: 900;
-  line-height: 1;
-}
-
-.rest-timer-main {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 42px;
-  color: #ffffff;
-  background: var(--brand);
-  border: 1px solid var(--brand);
-  border-radius: 8px;
-  cursor: pointer;
-  transition:
-    background 160ms ease,
-    border-color 160ms ease,
-    transform 160ms ease;
-}
-
 .tabs {
   display: inline-flex;
   align-items: center;
@@ -418,7 +254,11 @@ html:not([data-theme='dark']) .brand-mark img {
 
 .sync-panel.login {
   display: grid;
-  grid-template-columns: 18px minmax(170px, 230px) minmax(140px, 190px) auto auto;
+  grid-template-columns: 18px minmax(170px, 230px) minmax(140px, 190px) auto auto auto;
+}
+
+.sync-panel.login.password-recovery {
+  grid-template-columns: 18px minmax(190px, 260px) auto;
 }
 
 .sync-panel.login small {
@@ -428,6 +268,76 @@ html:not([data-theme='dark']) .brand-mark img {
 
 .sync-panel.login input {
   height: 36px;
+}
+
+.completion-banner {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 38px;
+  align-items: center;
+  gap: 10px;
+  width: min(760px, 100%);
+  margin: 0 auto 14px;
+  padding: 10px;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  border: 1px solid var(--brand-line);
+  border-radius: 12px;
+  box-shadow: var(--shadow-soft);
+  backdrop-filter: blur(14px);
+}
+
+.completion-banner > div:not(.streak-flame) {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.completion-banner strong {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.completion-banner span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.streak-flame {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  color: var(--brand);
+  background: var(--brand-soft);
+  border: 1px solid var(--brand-line);
+  border-radius: 12px;
+}
+
+.streak-flame.level-1 {
+  opacity: 0.62;
+}
+
+.streak-flame.level-2 {
+  opacity: 0.75;
+}
+
+.streak-flame.level-3 {
+  opacity: 0.9;
+  filter: saturate(1.1);
+}
+
+.streak-flame.level-4 {
+  filter: saturate(1.35) drop-shadow(0 0 7px color-mix(in srgb, var(--brand) 34%, transparent));
+}
+
+.streak-flame.level-5 {
+  filter: saturate(1.6) drop-shadow(0 0 12px color-mix(in srgb, var(--brand) 48%, transparent));
+  animation: flamePulse 1.6s ease-in-out infinite;
 }
 
 .enter {
@@ -586,6 +496,28 @@ html:not([data-theme='dark']) .brand-mark img {
   padding: 14px;
   background: color-mix(in srgb, var(--surface) 92%, transparent);
   backdrop-filter: blur(14px);
+}
+
+.workout-start .workout-head {
+  animation: workoutStart 760ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.workout-start .exercise-block,
+.workout-start .cardio-block {
+  animation: workoutItemIn 520ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.workout-start .exercise-block:nth-child(2) {
+  animation-delay: 55ms;
+}
+
+.workout-start .exercise-block:nth-child(3) {
+  animation-delay: 95ms;
+}
+
+.workout-start .exercise-block:nth-child(n + 4),
+.workout-start .cardio-block {
+  animation-delay: 135ms;
 }
 
 .workout-progress {
@@ -1298,6 +1230,7 @@ button:not(:disabled) {
 
 .primary-button,
 .secondary-button,
+.ghost-button,
 .finish-button,
 .icon-button {
   display: inline-flex;
@@ -1335,10 +1268,21 @@ button:not(:disabled) {
   padding: 0 12px;
 }
 
+.ghost-button.compact {
+  width: auto;
+  min-height: 36px;
+  padding: 0 10px;
+}
+
 .secondary-button,
+.ghost-button,
 .icon-button {
   background: var(--surface);
   border: 1px solid var(--line);
+}
+
+.ghost-button {
+  color: var(--muted);
 }
 
 .secondary-button {
@@ -1387,11 +1331,10 @@ button:not(:disabled) {
 .primary-button:hover,
 .finish-button:hover,
 .secondary-button:hover,
+.ghost-button:hover,
 .icon-button:hover,
 .add-photo-button:hover,
-.account-status:hover,
-.rest-timer-button:hover,
-.rest-timer-main:hover {
+.account-status:hover {
   transform: translateY(-1px);
 }
 
@@ -1474,6 +1417,43 @@ button:not(:disabled):active {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes workoutStart {
+  0% {
+    border-color: var(--brand-line);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--brand) 24%, transparent);
+    transform: scale(0.985);
+  }
+  55% {
+    border-color: var(--brand);
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--brand) 10%, transparent);
+    transform: scale(1.01);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes workoutItemIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes flamePulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.06);
   }
 }
 
@@ -1570,38 +1550,6 @@ button:not(:disabled):active {
     width: 40px;
     min-height: 40px;
     border-radius: 12px;
-  }
-
-  .rest-timer-button {
-    min-width: 72px;
-    min-height: 40px;
-    padding: 0 8px;
-    border-radius: 12px;
-    font-size: 12px;
-  }
-
-  .rest-timer-popover {
-    position: fixed;
-    top: calc(62px + env(safe-area-inset-top));
-    right: 12px;
-    width: min(282px, calc(100vw - 24px));
-    border-radius: 16px;
-  }
-
-  .rest-timer-controls {
-    grid-template-columns: 42px 42px minmax(0, 1fr) 42px;
-    gap: 7px;
-  }
-
-  .rest-timer-popover > strong {
-    font-size: 32px;
-  }
-
-  .rest-timer-presets button,
-  .rest-notification-button,
-  .rest-notification-status {
-    min-height: 34px;
-    border-radius: 10px;
   }
 
   .tabs {
@@ -1713,7 +1661,8 @@ button:not(:disabled):active {
   }
 
   .sync-panel.login .primary-button.compact,
-  .sync-panel.login .secondary-button.compact {
+  .sync-panel.login .secondary-button.compact,
+  .sync-panel.login .ghost-button.compact {
     min-height: 38px;
     padding: 0 8px;
     font-size: 12px;
@@ -1729,12 +1678,42 @@ button:not(:disabled):active {
     grid-row: 2;
   }
 
+  .sync-panel.login .ghost-button.compact {
+    grid-column: 2 / -1;
+    grid-row: 3;
+  }
+
+  .sync-panel.login.password-recovery input:first-of-type,
+  .sync-panel.login.password-recovery input:last-of-type {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .sync-panel.login.password-recovery .primary-button.compact {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
   .sync-panel.login small {
     grid-column: 2 / -1;
   }
 
   .sync-panel.muted {
     justify-content: center;
+  }
+
+  .completion-banner {
+    grid-template-columns: 40px minmax(0, 1fr) 36px;
+    width: 100%;
+    margin-bottom: 12px;
+    padding: 8px;
+    border-radius: 16px;
+  }
+
+  .streak-flame {
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
   }
 
   input,
@@ -1947,7 +1926,7 @@ button:not(:disabled):active {
   .set-line input {
     height: 38px;
     padding: 0 6px;
-    font-size: 15px;
+    font-size: 16px;
     text-align: center;
   }
 
@@ -1969,7 +1948,7 @@ button:not(:disabled):active {
   .cardio-grid input {
     height: 40px;
     padding: 0 6px;
-    font-size: 14px;
+    font-size: 16px;
   }
 
   .cardio-toggle {
@@ -2057,7 +2036,7 @@ button:not(:disabled):active {
   .editor-set input {
     height: 38px;
     padding: 0 5px;
-    font-size: 14px;
+    font-size: 16px;
   }
 
   .detail-sets {
