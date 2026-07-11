@@ -51,7 +51,10 @@ describe('domain helpers', () => {
 
     const days = buildCalendarDays('2026-07', [startedWorkout, fallbackWorkout])
 
-    expect(days).toHaveLength(42)
+    expect(days).toHaveLength(35)
+    expect(days[0]).toMatchObject({ date: '2026-07-01', dayNumber: 1, isCurrentMonth: true })
+    expect(days.find((day) => day.dayNumber === 31)).toMatchObject({ date: '2026-07-31', isCurrentMonth: true })
+    expect(days.at(-1)).toMatchObject({ dayNumber: null, isCurrentMonth: false, workouts: [] })
     expect(days.find((day) => day.date === '2026-07-10')?.workouts).toEqual([startedWorkout])
     expect(days.find((day) => day.date === '2026-07-12')?.workouts).toEqual([fallbackWorkout])
     expect(getWorkoutStartDate(fallbackWorkout)).toBe('2026-07-12')

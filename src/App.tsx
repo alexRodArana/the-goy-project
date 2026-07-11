@@ -2093,18 +2093,14 @@ function HistoryCalendar({
         </button>
       </div>
 
-      <div className="calendar-weekdays" aria-hidden="true">
-        {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((day, index) => (
-          <span key={`${day}-${index}`}>{day}</span>
-        ))}
-      </div>
-
       <div className="calendar-grid">
         {days.map((day) => {
-          const hasWorkout = day.workouts.length > 0
-          const isSelected = day.date === selectedDate
+          const isEmpty = day.dayNumber === null
+          const hasWorkout = !isEmpty && day.workouts.length > 0
+          const isSelected = !isEmpty && day.date === selectedDate
           const className = [
             'calendar-day',
+            isEmpty ? 'empty' : '',
             day.isCurrentMonth ? '' : 'muted',
             hasWorkout ? 'trained' : '',
             isSelected ? 'selected' : '',
@@ -2114,11 +2110,17 @@ function HistoryCalendar({
 
           return (
             <button
-              aria-label={`${formatDate(day.date)}${hasWorkout ? `, ${day.workouts.length} entrenamiento` : ', sin entrenamiento'}`}
+              aria-label={
+                isEmpty ? 'Dia vacio' : `${formatDate(day.date)}${hasWorkout ? `, ${day.workouts.length} entrenamiento` : ', sin entrenamiento'}`
+              }
               className={className}
+              disabled={isEmpty}
               key={day.date}
               type="button"
               onClick={() => {
+                if (isEmpty) {
+                  return
+                }
                 vibrate(hasWorkout ? 10 : 4)
                 onSelectDate(day.date)
                 setEditingWorkoutId('')
@@ -2126,7 +2128,7 @@ function HistoryCalendar({
                 setSelectedWorkoutId('')
               }}
             >
-              <span>{day.dayNumber}</span>
+              <span>{day.dayNumber ?? ''}</span>
             </button>
           )
         })}

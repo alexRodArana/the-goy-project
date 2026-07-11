@@ -748,18 +748,10 @@ html:not([data-theme='dark']) .brand-mark img {
   white-space: nowrap;
 }
 
-.calendar-weekdays,
 .calendar-grid {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 6px;
-}
-
-.calendar-weekdays span {
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 900;
-  text-align: center;
 }
 
 .calendar-day {
@@ -788,6 +780,20 @@ html:not([data-theme='dark']) .brand-mark img {
 
 .calendar-day:hover {
   transform: translateY(-1px);
+}
+
+.calendar-day.empty {
+  pointer-events: none;
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  cursor: default;
+  opacity: 1;
+}
+
+.calendar-day.empty:hover,
+.calendar-day:disabled:hover {
+  transform: none;
 }
 
 .calendar-day.muted {
@@ -2039,7 +2045,6 @@ button:not(:disabled):active {
     font-size: 16px;
   }
 
-  .calendar-weekdays,
   .calendar-grid {
     gap: 5px;
   }

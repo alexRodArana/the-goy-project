@@ -2,7 +2,7 @@ import type { Workout } from './types'
 
 export type CalendarDay = {
   date: string
-  dayNumber: number
+  dayNumber: number | null
   isCurrentMonth: boolean
   workouts: Workout[]
 }
@@ -107,8 +107,7 @@ export const getFireLevel = (streak: number) => (streak <= 0 ? 0 : Math.min(5, M
 
 export function buildCalendarDays(monthKey: string, workouts: Workout[]): CalendarDay[] {
   const [year, month] = monthKey.split('-').map(Number)
-  const firstDay = new Date(year, month - 1, 1)
-  const startOffset = (firstDay.getDay() + 6) % 7
+  const daysInMonth = new Date(year, month, 0).getDate()
   const workoutsByDate = new Map<string, Workout[]>()
 
   workouts.forEach((workout) => {
@@ -116,14 +115,24 @@ export function buildCalendarDays(monthKey: string, workouts: Workout[]): Calend
     workoutsByDate.set(startDate, [...(workoutsByDate.get(startDate) ?? []), workout])
   })
 
-  return Array.from({ length: 42 }, (_, index) => {
-    const date = new Date(year, month - 1, index - startOffset + 1)
-    const dateKey = toDateKey(date)
+  return Array.from({ length: 35 }, (_, index) => {
+    const dayNumber = index + 1
+
+    if (dayNumber > daysInMonth) {
+      return {
+        date: `${monthKey}-empty-${index}`,
+        dayNumber: null,
+        isCurrentMonth: false,
+        workouts: [],
+      }
+    }
+
+    const dateKey = `${monthKey}-${String(dayNumber).padStart(2, '0')}`
 
     return {
       date: dateKey,
-      dayNumber: date.getDate(),
-      isCurrentMonth: date.getMonth() === month - 1,
+      dayNumber,
+      isCurrentMonth: true,
       workouts: workoutsByDate.get(dateKey) ?? [],
     }
   })
