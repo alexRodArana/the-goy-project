@@ -107,7 +107,10 @@ export const getFireLevel = (streak: number) => (streak <= 0 ? 0 : Math.min(5, M
 
 export function buildCalendarDays(monthKey: string, workouts: Workout[]): CalendarDay[] {
   const [year, month] = monthKey.split('-').map(Number)
+  const firstDay = new Date(year, month - 1, 1)
+  const startOffset = (firstDay.getDay() + 6) % 7
   const daysInMonth = new Date(year, month, 0).getDate()
+  const totalCells = Math.ceil((startOffset + daysInMonth) / 7) * 7
   const workoutsByDate = new Map<string, Workout[]>()
 
   workouts.forEach((workout) => {
@@ -115,10 +118,10 @@ export function buildCalendarDays(monthKey: string, workouts: Workout[]): Calend
     workoutsByDate.set(startDate, [...(workoutsByDate.get(startDate) ?? []), workout])
   })
 
-  return Array.from({ length: 35 }, (_, index) => {
-    const dayNumber = index + 1
+  return Array.from({ length: totalCells }, (_, index) => {
+    const dayNumber = index - startOffset + 1
 
-    if (dayNumber > daysInMonth) {
+    if (dayNumber < 1 || dayNumber > daysInMonth) {
       return {
         date: `${monthKey}-empty-${index}`,
         dayNumber: null,

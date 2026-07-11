@@ -2093,6 +2093,12 @@ function HistoryCalendar({
         </button>
       </div>
 
+      <div className="calendar-weekdays" aria-hidden="true">
+        {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((day, index) => (
+          <span key={`${day}-${index}`}>{day}</span>
+        ))}
+      </div>
+
       <div className="calendar-grid">
         {days.map((day) => {
           const isEmpty = day.dayNumber === null

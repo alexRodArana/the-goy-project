@@ -52,12 +52,24 @@ describe('domain helpers', () => {
     const days = buildCalendarDays('2026-07', [startedWorkout, fallbackWorkout])
 
     expect(days).toHaveLength(35)
-    expect(days[0]).toMatchObject({ date: '2026-07-01', dayNumber: 1, isCurrentMonth: true })
+    expect(days[0]).toMatchObject({ dayNumber: null, isCurrentMonth: false, workouts: [] })
+    expect(days[1]).toMatchObject({ dayNumber: null, isCurrentMonth: false, workouts: [] })
+    expect(days[2]).toMatchObject({ date: '2026-07-01', dayNumber: 1, isCurrentMonth: true })
     expect(days.find((day) => day.dayNumber === 31)).toMatchObject({ date: '2026-07-31', isCurrentMonth: true })
     expect(days.at(-1)).toMatchObject({ dayNumber: null, isCurrentMonth: false, workouts: [] })
     expect(days.find((day) => day.date === '2026-07-10')?.workouts).toEqual([startedWorkout])
     expect(days.find((day) => day.date === '2026-07-12')?.workouts).toEqual([fallbackWorkout])
     expect(getWorkoutStartDate(fallbackWorkout)).toBe('2026-07-12')
+  })
+
+  it('uses a real calendar shape without rendering next-month day numbers', () => {
+    const days = buildCalendarDays('2026-08', [])
+
+    expect(days).toHaveLength(42)
+    expect(days.slice(0, 5).every((day) => day.dayNumber === null)).toBe(true)
+    expect(days[5]).toMatchObject({ date: '2026-08-01', dayNumber: 1, isCurrentMonth: true })
+    expect(days.find((day) => day.dayNumber === 31)).toMatchObject({ date: '2026-08-31', isCurrentMonth: true })
+    expect(days.slice(days.findIndex((day) => day.dayNumber === 31) + 1).every((day) => day.dayNumber === null)).toBe(true)
   })
 
   it('allows up to two rest days while calculating the active streak', () => {
