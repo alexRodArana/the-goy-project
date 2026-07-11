@@ -54,6 +54,22 @@ import {
   updatePassword,
   type SyncSession,
 } from './supabase'
+import {
+  addMonths,
+  buildCalendarDays,
+  formatDate,
+  formatDuration,
+  formatMonthKey,
+  formatNumber,
+  formatShortDate,
+  formatTime,
+  getFireLevel,
+  getFlexibleTrainingStreak,
+  getWorkoutStartDate,
+  normalizeName,
+  todayIso,
+  type CalendarDay,
+} from './domain'
 import type {
   ActiveWorkout,
   AppState,
@@ -75,13 +91,6 @@ type AccentOption = {
   key: AccentColor
   label: string
   color: string
-}
-
-type CalendarDay = {
-  date: string
-  dayNumber: number
-  isCurrentMonth: boolean
-  workouts: Workout[]
 }
 
 type RoutineDraft = {
@@ -124,79 +133,7 @@ type FinishSummary = {
   streak: number
 }
 
-const toDateKey = (date: Date) =>
-  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-
-const todayIso = () => toDateKey(new Date())
-
 const createId = (prefix: string) => `${prefix}-${crypto.randomUUID()}`
-
-const toLocalDate = (value: string) => new Date(`${value}T12:00:00`)
-
-const toMonthKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-
-const getWorkoutStartDate = (workout: Workout) => {
-  const startedAt = new Date(workout.startedAt)
-  return Number.isNaN(startedAt.getTime()) ? workout.date : toDateKey(startedAt)
-}
-
-const formatDate = (value: string) =>
-  new Intl.DateTimeFormat('es-MX', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  }).format(toLocalDate(value))
-
-const formatTime = (value: string) => {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) {
-    return '--:--'
-  }
-
-  return new Intl.DateTimeFormat('es-MX', {
-    hour: '2-digit',
-    hour12: false,
-    minute: '2-digit',
-  }).format(date)
-}
-
-const formatShortDate = (value: string) =>
-  new Intl.DateTimeFormat('es-MX', {
-    day: 'numeric',
-    month: 'short',
-  }).format(toLocalDate(value))
-
-const formatMonth = (value: string) => {
-  const label = new Intl.DateTimeFormat('es-MX', {
-    month: 'long',
-    year: 'numeric',
-  }).format(toLocalDate(value))
-  return `${label.charAt(0).toUpperCase()}${label.slice(1)}`
-}
-
-const formatNumber = (value: number) =>
-  new Intl.NumberFormat('es-MX', {
-    maximumFractionDigits: value >= 100 ? 0 : 1,
-  }).format(value)
-
-const formatDuration = (seconds: number) => {
-  const safeSeconds = Math.max(0, Math.floor(seconds))
-  const hours = Math.floor(safeSeconds / 3600)
-  const minutes = Math.floor((safeSeconds % 3600) / 60)
-  const rest = safeSeconds % 60
-
-  return [hours, minutes, rest].map((part) => String(part).padStart(2, '0')).join(':')
-}
-
-const normalizeName = (value: string) => value.trim().toLocaleLowerCase('es-MX')
-
-const addMonths = (monthKey: string, offset: number) => {
-  const [year, month] = monthKey.split('-').map(Number)
-  const date = new Date(year, month - 1 + offset, 1)
-  return toMonthKey(date)
-}
-
-const formatMonthKey = (monthKey: string) => formatMonth(`${monthKey}-01`)
 
 const wait = (milliseconds: number) => new Promise((resolve) => window.setTimeout(resolve, milliseconds))
 
@@ -204,33 +141,7 @@ const updateMetaContent = (selector: string, content: string) => {
   document.querySelector(selector)?.setAttribute('content', content)
 }
 
-const dayDifference = (laterDate: string, earlierDate: string) =>
-  Math.round((toLocalDate(laterDate).getTime() - toLocalDate(earlierDate).getTime()) / 86_400_000)
-
 const completionMessages = ['Bien hecho.', 'Buen trabajo.', 'Rutina completada.', 'Trabajo limpio.', 'Entreno cerrado.']
-
-const getFlexibleTrainingStreak = (workouts: Workout[], referenceDate = todayIso()) => {
-  const dates = [...new Set(workouts.map(getWorkoutStartDate).filter((date) => date <= referenceDate))].sort((a, b) =>
-    b.localeCompare(a),
-  )
-
-  const latestDate = dates[0]
-  if (!latestDate || dayDifference(referenceDate, latestDate) > 3) {
-    return 0
-  }
-
-  let streak = 1
-  for (let index = 1; index < dates.length; index += 1) {
-    if (dayDifference(dates[index - 1], dates[index]) > 3) {
-      break
-    }
-    streak += 1
-  }
-
-  return streak
-}
-
-const getFireLevel = (streak: number) => (streak <= 0 ? 0 : Math.min(5, Math.max(1, Math.ceil(streak / 3))))
 
 const selectInputValue = (event: ReactFocusEvent<HTMLInputElement>) => {
   const input = event.currentTarget
@@ -2170,8 +2081,6 @@ function HistoryCalendar({
   setSelectedWorkoutId: Dispatch<SetStateAction<string>>
   updateWorkout: (workout: Workout) => void
 }) {
-  const selectedDateLabel = formatDate(selectedDate)
-
   return (
     <section className="surface history-calendar">
       <div className="calendar-head">
@@ -2224,7 +2133,6 @@ function HistoryCalendar({
       </div>
 
       <div className="calendar-summary">
-        <span>{selectedDateLabel}</span>
         {selectedWorkouts.length ? (
           <div className="calendar-workouts">
             {selectedWorkouts.map((workout) => (
@@ -2240,7 +2148,6 @@ function HistoryCalendar({
                   }}
                 >
                   <strong>{workout.routineName}</strong>
-                  <small>{formatDuration(workout.durationSeconds)}</small>
                 </button>
 
                 {expandedWorkoutId === workout.id &&
@@ -2902,30 +2809,6 @@ function Field({ children, label }: { children: ReactNode; label: string }) {
       {children}
     </label>
   )
-}
-
-function buildCalendarDays(monthKey: string, workouts: Workout[]): CalendarDay[] {
-  const [year, month] = monthKey.split('-').map(Number)
-  const firstDay = new Date(year, month - 1, 1)
-  const startOffset = (firstDay.getDay() + 6) % 7
-  const workoutsByDate = new Map<string, Workout[]>()
-
-  workouts.forEach((workout) => {
-    const startDate = getWorkoutStartDate(workout)
-    workoutsByDate.set(startDate, [...(workoutsByDate.get(startDate) ?? []), workout])
-  })
-
-  return Array.from({ length: 42 }, (_, index) => {
-    const date = new Date(year, month - 1, index - startOffset + 1)
-    const dateKey = toDateKey(date)
-
-    return {
-      date: dateKey,
-      dayNumber: date.getDate(),
-      isCurrentMonth: date.getMonth() === month - 1,
-      workouts: workoutsByDate.get(dateKey) ?? [],
-    }
-  })
 }
 
 export default App

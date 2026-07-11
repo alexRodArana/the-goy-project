@@ -808,18 +808,12 @@ html:not([data-theme='dark']) .brand-mark img {
 
 .calendar-summary {
   display: grid;
-  gap: 8px;
+  gap: 0;
   min-height: 58px;
-  padding: 10px;
-  background: var(--field);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-}
-
-.calendar-summary > span {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 850;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
 }
 
 .calendar-summary > strong {
@@ -829,7 +823,7 @@ html:not([data-theme='dark']) .brand-mark img {
 
 .calendar-workouts {
   display: grid;
-  gap: 6px;
+  gap: 8px;
 }
 
 .calendar-workout {
@@ -848,10 +842,8 @@ html:not([data-theme='dark']) .brand-mark img {
 }
 
 .calendar-workout > button {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  display: flex;
   align-items: center;
-  gap: 8px;
   width: 100%;
   min-height: 46px;
   padding: 0 10px;
@@ -864,19 +856,14 @@ html:not([data-theme='dark']) .brand-mark img {
 }
 
 .calendar-workout > button strong {
+  display: block;
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   color: var(--ink);
   font-size: 14px;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.calendar-workout > button small {
-  color: var(--brand-ink);
-  font-size: 12px;
-  font-weight: 850;
-  font-variant-numeric: tabular-nums;
 }
 
 .timeline-swipe-card.dragging {
@@ -2065,8 +2052,6 @@ button:not(:disabled):active {
 
   .calendar-summary {
     min-height: 54px;
-    padding: 9px;
-    border-radius: 12px;
   }
 
   .detail-head {
