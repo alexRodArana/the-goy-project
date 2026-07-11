@@ -368,21 +368,34 @@ html:not([data-theme='dark']) .brand-mark img {
   margin: 0 auto;
 }
 
+.training-home {
+  display: grid;
+  align-content: center;
+  gap: 16px;
+}
+
 .start-card {
   display: grid;
+  width: 100%;
   gap: 18px;
   padding: 18px;
   animation: rise 240ms ease both;
 }
 
 .training-phrase {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 124px;
   max-width: 720px;
-  margin: 0 auto 16px;
+  margin: 0 auto;
+  overflow: hidden;
   color: var(--ink);
   font-size: clamp(24px, 8vw, 46px);
   font-weight: 920;
   line-height: 1.02;
   text-align: center;
+  text-wrap: balance;
   animation: phraseIn 520ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
@@ -589,8 +602,8 @@ html:not([data-theme='dark']) .brand-mark img {
 }
 
 .cardio-block.complete {
-  background: var(--ok-soft);
-  border-color: var(--ok-line);
+  background: var(--brand-soft);
+  border-color: var(--brand-line);
 }
 
 .exercise-title {
@@ -644,8 +657,8 @@ html:not([data-theme='dark']) .brand-mark img {
 }
 
 .set-line.complete {
-  background: var(--ok-soft);
-  border-color: var(--ok-line);
+  background: var(--brand-soft);
+  border-color: var(--brand-line);
 }
 
 .set-line strong {
@@ -667,8 +680,8 @@ html:not([data-theme='dark']) .brand-mark img {
 }
 
 .set-line.complete .complete-toggle {
-  color: var(--ok);
-  border-color: var(--ok-line);
+  color: var(--brand);
+  border-color: var(--brand-line);
 }
 
 .cardio-grid {
@@ -700,8 +713,8 @@ html:not([data-theme='dark']) .brand-mark img {
 }
 
 .cardio-toggle.complete {
-  color: var(--ok);
-  border-color: var(--ok-line);
+  color: var(--brand);
+  border-color: var(--brand-line);
 }
 
 .history-feed {
@@ -926,8 +939,8 @@ html:not([data-theme='dark']) .brand-mark img {
 }
 
 .editor-set.complete {
-  background: var(--ok-soft);
-  border-color: var(--ok-line);
+  background: var(--brand-soft);
+  border-color: var(--brand-line);
 }
 
 .editor-set strong {
@@ -946,6 +959,46 @@ html:not([data-theme='dark']) .brand-mark img {
 .history-detail {
   min-height: 420px;
   padding: 18px;
+}
+
+.detail-workout-head {
+  position: static;
+  top: auto;
+  margin-bottom: 12px;
+}
+
+.detail-workout-head .history-actions {
+  flex: 0 0 auto;
+}
+
+.detail-session {
+  gap: 10px;
+}
+
+.detail-set-line .detail-complete-toggle {
+  cursor: default;
+}
+
+.detail-set-value {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 42px;
+  padding: 0 11px;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 760;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: var(--input);
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+}
+
+.detail-cardio-grid .field {
+  min-width: 0;
 }
 
 .detail-head {
@@ -1775,8 +1828,10 @@ button:not(:disabled):active {
   }
 
   .training-phrase {
+    align-items: flex-end;
+    height: 136px;
     width: min(100%, 340px);
-    margin-bottom: 14px;
+    margin: 0 auto;
     font-size: clamp(28px, 9vw, 38px);
   }
 
@@ -1868,6 +1923,13 @@ button:not(:disabled):active {
   .workout-progress {
     grid-column: 1 / -1;
     height: 8px;
+  }
+
+  .detail-workout-head .history-actions {
+    display: flex;
+    grid-column: 2;
+    grid-row: 1;
+    justify-content: flex-end;
   }
 
   .workout-head > div {
@@ -2029,6 +2091,13 @@ button:not(:disabled):active {
   .detail-exercise {
     padding: 12px;
     border-radius: 16px;
+  }
+
+  .detail-set-value {
+    min-height: 38px;
+    padding: 0 6px;
+    font-size: 16px;
+    border-radius: 12px;
   }
 
   .editor-grid {

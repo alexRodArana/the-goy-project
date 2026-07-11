@@ -147,6 +147,19 @@ const formatDate = (value: string) =>
     year: 'numeric',
   }).format(toLocalDate(value))
 
+const formatTime = (value: string) => {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return '--:--'
+  }
+
+  return new Intl.DateTimeFormat('es-MX', {
+    hour: '2-digit',
+    hour12: false,
+    minute: '2-digit',
+  }).format(date)
+}
+
 const formatShortDate = (value: string) =>
   new Intl.DateTimeFormat('es-MX', {
     day: 'numeric',
@@ -186,6 +199,10 @@ const addMonths = (monthKey: string, offset: number) => {
 const formatMonthKey = (monthKey: string) => formatMonth(`${monthKey}-01`)
 
 const wait = (milliseconds: number) => new Promise((resolve) => window.setTimeout(resolve, milliseconds))
+
+const updateMetaContent = (selector: string, content: string) => {
+  document.querySelector(selector)?.setAttribute('content', content)
+}
 
 const dayDifference = (laterDate: string, earlierDate: string) =>
   Math.round((toLocalDate(laterDate).getTime() - toLocalDate(earlierDate).getTime()) / 86_400_000)
@@ -732,6 +749,8 @@ function App() {
   useEffect(() => {
     document.documentElement.dataset.theme = theme
     localStorage.setItem('goy-theme', theme)
+    updateMetaContent('meta[name="theme-color"]', theme === 'dark' ? '#101417' : '#f5f7fb')
+    updateMetaContent('meta[name="apple-mobile-web-app-status-bar-style"]', theme === 'dark' ? 'black-translucent' : 'default')
   }, [theme])
 
   useEffect(() => {
@@ -2259,42 +2278,92 @@ function WorkoutDetail({
   onEdit: () => void
   workout: Workout
 }) {
+  const totalSets = workout.exercises.reduce((total, exercise) => total + exercise.sets.length, 0)
+  const completedSets = workout.exercises.reduce(
+    (total, exercise) => total + exercise.sets.filter((set) => set.completed).length,
+    0,
+  )
+  const progressPercent = totalSets ? Math.round((completedSets / totalSets) * 100) : 0
+
   return (
     <section className="history-expanded">
-      <div className="history-actions">
-        <button className="secondary-button compact" type="button" onClick={onEdit}>
-          <Pencil size={16} />
-          Editar
-        </button>
-        <button className="secondary-button compact danger-text" type="button" onClick={onDelete}>
-          <Trash2 size={16} />
-          Eliminar
-        </button>
+      <div className="workout-head detail-workout-head surface">
+        <div>
+          <span>{workout.routineName}</span>
+          <strong>
+            <Timer size={18} />
+            Duracion {formatDuration(workout.durationSeconds)}
+          </strong>
+          <small>
+            Inicio {formatTime(workout.startedAt)} · Fin {formatTime(workout.endedAt)}
+          </small>
+        </div>
+        <div className="history-actions">
+          <button aria-label="Editar entrenamiento" className="icon-button" data-tooltip="Editar" type="button" onClick={onEdit}>
+            <Pencil size={17} />
+          </button>
+          <button
+            aria-label="Eliminar entrenamiento"
+            className="icon-button danger"
+            data-tooltip="Eliminar"
+            type="button"
+            onClick={onDelete}
+          >
+            <Trash2 size={17} />
+          </button>
+        </div>
+        <div
+          aria-label={`Progreso ${progressPercent}%`}
+          aria-valuemax={100}
+          aria-valuemin={0}
+          aria-valuenow={progressPercent}
+          className="workout-progress"
+          role="progressbar"
+        >
+          <span style={{ width: `${progressPercent}%` }} />
+        </div>
       </div>
-      <div className="detail-exercises">
-        {workout.exercises.map((exercise) => (
-          <article className="detail-exercise" key={exercise.id}>
-            <h3>{exercise.name}</h3>
-            <div className="detail-sets">
+
+      <div className="exercise-session detail-session">
+        {workout.exercises.map((exercise, index) => (
+          <article className="exercise-block" key={exercise.id}>
+            <div className="exercise-title">
+              <span>{String(index + 1).padStart(2, '0')}</span>
+              <h2>{exercise.name}</h2>
+            </div>
+            <div className="set-table">
               {exercise.sets.map((set) => (
-                <span key={set.id}>
-                  {set.setNumber}. {set.weight === null ? '--' : formatNumber(set.weight)} kg · {set.reps ?? '--'} reps
-                </span>
+                <div className={set.completed ? 'set-line detail-set-line complete' : 'set-line detail-set-line'} key={set.id}>
+                  <span className="complete-toggle detail-complete-toggle" aria-hidden="true">
+                    {set.completed ? <CheckCircle2 size={18} /> : <Check size={18} />}
+                  </span>
+                  <strong>{set.setNumber}</strong>
+                  <span className="detail-set-value">{set.weight === null ? '--' : formatNumber(set.weight)} kg</span>
+                  <span className="detail-set-value">{set.reps ?? '--'} reps</span>
+                </div>
               ))}
             </div>
           </article>
         ))}
 
         {hasCardioEntry(workout.cardio) && (
-          <article className="detail-exercise detail-cardio">
-            <h3>
-              <Activity size={17} />
-              Cardio
-            </h3>
-            <div className="cardio-stats">
-              <span>{formatCardioNumber(workout.cardio.incline, '%')} incl.</span>
-              <span>{formatCardioNumber(workout.cardio.speed, 'km/h')}</span>
-              <span>{formatCardioNumber(workout.cardio.durationMinutes, 'min')}</span>
+          <article className={workout.cardio.completed ? 'cardio-block complete' : 'cardio-block'}>
+            <div className="exercise-title">
+              <span>
+                <Activity size={16} />
+              </span>
+              <h2>Cardio</h2>
+            </div>
+            <div className="cardio-grid detail-cardio-grid">
+              <Field label="Inclinacion">
+                <span className="detail-set-value">{formatCardioNumber(workout.cardio.incline, '%')}</span>
+              </Field>
+              <Field label="Velocidad">
+                <span className="detail-set-value">{formatCardioNumber(workout.cardio.speed, 'km/h')}</span>
+              </Field>
+              <Field label="Tiempo">
+                <span className="detail-set-value">{formatCardioNumber(workout.cardio.durationMinutes, 'min')}</span>
+              </Field>
             </div>
           </article>
         )}
