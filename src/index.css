@@ -21,6 +21,7 @@
 
   color: var(--ink);
   background: var(--bg);
+  caret-color: var(--brand);
   font-family: 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-feature-settings:
     'liga' 1,
