@@ -5,7 +5,6 @@ import type { AppState } from './types'
 const { testState } = vi.hoisted(() => {
   const state: AppState = {
     activeWorkout: undefined,
-    checkIns: [],
     routines: [
       {
         days: ['Lunes'],
@@ -70,7 +69,6 @@ vi.mock('./sampleData', () => ({
 
 vi.mock('./storage', () => ({
   loadLocalState: vi.fn(async () => testState),
-  readPhotoAsDataUrl: vi.fn(),
   saveLocalState: vi.fn(async () => undefined),
 }))
 

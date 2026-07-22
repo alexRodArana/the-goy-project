@@ -1,10 +1,7 @@
 .app-shell {
   min-height: 100svh;
   color: var(--ink);
-  background:
-    radial-gradient(circle at 12% 0%, var(--wash-a), transparent 34rem),
-    radial-gradient(circle at 86% 8%, var(--wash-b), transparent 32rem),
-    var(--bg);
+  background: var(--bg);
 }
 
 .app-header {
@@ -137,9 +134,9 @@ html:not([data-theme='dark']) .brand-mark img {
   justify-content: center;
   width: 42px;
   min-height: 42px;
-  color: var(--ok);
-  background: var(--ok-soft);
-  border: 1px solid var(--ok-line);
+  color: var(--on-brand);
+  background: var(--brand);
+  border: 1px solid transparent;
   border-radius: 8px;
   cursor: pointer;
   transition:
@@ -201,8 +198,8 @@ html:not([data-theme='dark']) .brand-mark img {
 }
 
 .tab.active {
-  color: var(--ink);
-  background: var(--surface);
+  color: var(--on-brand);
+  background: var(--brand);
   box-shadow: var(--shadow-soft);
 }
 
@@ -212,8 +209,7 @@ html:not([data-theme='dark']) .brand-mark img {
   padding: 28px 0 44px;
 }
 
-.main-training:not(.main-focus),
-.main-timeline {
+.main-training:not(.main-focus) {
   display: grid;
   align-content: center;
   min-height: calc(100svh - 170px);
@@ -239,8 +235,13 @@ html:not([data-theme='dark']) .brand-mark img {
 }
 
 .sync-panel.connected {
-  color: var(--brand-ink);
-  border-color: var(--brand-line);
+  color: var(--on-brand);
+  background: var(--brand);
+  border-color: transparent;
+}
+
+.sync-panel.connected strong {
+  color: var(--on-brand);
 }
 
 .sync-panel strong {
@@ -280,7 +281,7 @@ html:not([data-theme='dark']) .brand-mark img {
   padding: 10px;
   color: var(--ink);
   background: color-mix(in srgb, var(--surface) 90%, transparent);
-  border: 1px solid var(--brand-line);
+  border: 1px solid var(--line);
   border-radius: 12px;
   box-shadow: var(--shadow-soft);
   backdrop-filter: blur(14px);
@@ -317,9 +318,9 @@ html:not([data-theme='dark']) .brand-mark img {
   justify-content: center;
   width: 42px;
   height: 42px;
-  color: var(--brand);
-  background: var(--brand-soft);
-  border: 1px solid var(--brand-line);
+  color: var(--on-brand);
+  background: var(--brand);
+  border: 1px solid transparent;
   border-radius: 12px;
 }
 
@@ -423,12 +424,12 @@ html:not([data-theme='dark']) .brand-mark img {
   gap: 9px;
   min-height: 58px;
   width: 100%;
-  color: var(--brand-ink);
+  color: var(--on-brand);
   font: inherit;
   font-size: 16px;
   font-weight: 900;
-  background: var(--brand-soft);
-  border: 1px dashed var(--brand-line);
+  background: var(--brand);
+  border: 1px solid transparent;
   border-radius: 8px;
   cursor: pointer;
   transition:
@@ -550,12 +551,7 @@ html:not([data-theme='dark']) .brand-mark img {
 .workout-progress span {
   display: block;
   height: 100%;
-  background: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--brand) 58%, var(--surface)),
-    var(--brand),
-    color-mix(in srgb, var(--brand) 72%, var(--ink))
-  );
+  background: var(--brand);
   border-radius: inherit;
   transition: width 240ms ease;
 }
@@ -602,8 +598,15 @@ html:not([data-theme='dark']) .brand-mark img {
 }
 
 .cardio-block.complete {
-  background: var(--brand-soft);
-  border-color: var(--brand-line);
+  color: var(--on-brand);
+  background: var(--brand);
+  border-color: transparent;
+}
+
+.cardio-block.complete .exercise-title h2,
+.cardio-block.complete .field,
+.cardio-block.complete .field span {
+  color: var(--on-brand);
 }
 
 .exercise-title {
@@ -619,11 +622,11 @@ html:not([data-theme='dark']) .brand-mark img {
   justify-content: center;
   width: 30px;
   height: 30px;
-  color: var(--brand-ink);
+  color: var(--on-brand);
   font-size: 12px;
   font-weight: 900;
-  background: var(--brand-soft);
-  border: 1px solid var(--brand-line);
+  background: var(--brand);
+  border: 1px solid transparent;
   border-radius: 8px;
 }
 
@@ -657,13 +660,18 @@ html:not([data-theme='dark']) .brand-mark img {
 }
 
 .set-line.complete {
-  background: var(--brand-soft);
-  border-color: var(--brand-line);
+  color: var(--on-brand);
+  background: var(--brand);
+  border-color: transparent;
 }
 
 .set-line strong {
   color: var(--muted);
   text-align: center;
+}
+
+.set-line.complete strong {
+  color: var(--on-brand);
 }
 
 .complete-toggle {
@@ -680,8 +688,8 @@ html:not([data-theme='dark']) .brand-mark img {
 }
 
 .set-line.complete .complete-toggle {
-  color: var(--brand);
-  border-color: var(--brand-line);
+  color: var(--on-brand);
+  border-color: color-mix(in srgb, var(--on-brand) 34%, transparent);
 }
 
 .cardio-grid {
@@ -713,8 +721,9 @@ html:not([data-theme='dark']) .brand-mark img {
 }
 
 .cardio-toggle.complete {
-  color: var(--brand);
-  border-color: var(--brand-line);
+  color: var(--on-brand);
+  background: var(--brand);
+  border-color: transparent;
 }
 
 .history-feed {
@@ -809,15 +818,16 @@ html:not([data-theme='dark']) .brand-mark img {
 }
 
 .calendar-day.trained {
-  color: var(--brand-ink);
-  background: var(--brand-soft);
-  border-color: var(--brand-line);
+  color: var(--on-brand);
+  background: var(--brand);
+  border-color: transparent;
 }
 
 .calendar-day.selected {
-  color: var(--ink);
-  border-color: var(--brand);
-  box-shadow: 0 0 0 3px var(--focus);
+  color: var(--on-brand);
+  background: var(--brand);
+  border-color: transparent;
+  box-shadow: none;
 }
 
 .calendar-summary {
@@ -851,8 +861,12 @@ html:not([data-theme='dark']) .brand-mark img {
 }
 
 .calendar-workout.expanded {
-  background: color-mix(in srgb, var(--surface) 86%, var(--brand-soft));
-  border-color: var(--brand-line);
+  background: var(--brand);
+  border-color: transparent;
+}
+
+.calendar-workout.expanded > button strong {
+  color: var(--on-brand);
 }
 
 .calendar-workout > button {
@@ -878,10 +892,6 @@ html:not([data-theme='dark']) .brand-mark img {
   font-size: 14px;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.timeline-swipe-card.dragging {
-  transition: none;
 }
 
 .history-expanded {
@@ -940,8 +950,14 @@ html:not([data-theme='dark']) .brand-mark img {
 }
 
 .editor-set.complete {
-  background: var(--brand-soft);
-  border-color: var(--brand-line);
+  color: var(--on-brand);
+  background: var(--brand);
+  border-color: transparent;
+}
+
+.editor-set.complete > strong,
+.editor-set.complete .complete-toggle {
+  color: var(--on-brand);
 }
 
 .editor-set strong {
@@ -1081,168 +1097,6 @@ html:not([data-theme='dark']) .brand-mark img {
   border-radius: 999px;
 }
 
-.timeline-horizontal {
-  display: grid;
-  align-items: center;
-  overflow-x: auto;
-  padding: 10px 4px 24px;
-}
-
-.timeline-track {
-  position: relative;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  gap: 22px;
-  width: max-content;
-  min-width: 100%;
-  padding: 24px 8px 8px;
-}
-
-.timeline-track::before {
-  content: '';
-  position: absolute;
-  top: 24px;
-  left: 28px;
-  right: 28px;
-  height: 2px;
-  background: linear-gradient(90deg, var(--brand), var(--line));
-}
-
-.timeline-item {
-  position: relative;
-  display: grid;
-  justify-items: center;
-  gap: 10px;
-  width: 244px;
-  animation: rise 240ms ease both;
-}
-
-.timeline-dot {
-  position: relative;
-  z-index: 1;
-  width: 16px;
-  height: 16px;
-  background: var(--brand);
-  border: 4px solid var(--bg);
-  border-radius: 999px;
-}
-
-.timeline-dot.add {
-  background: var(--surface);
-  border-color: var(--brand);
-}
-
-.vertical-photo-card {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 232px;
-  aspect-ratio: 3 / 4;
-  overflow: hidden;
-  touch-action: pan-x;
-  color: var(--muted);
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  box-shadow: var(--shadow);
-  transition:
-    border-color 180ms ease,
-    box-shadow 180ms ease,
-    transform 180ms ease;
-}
-
-.timeline-actions {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  z-index: 2;
-  display: flex;
-  gap: 6px;
-}
-
-.timeline-swipe-card[data-swipe='edit'] {
-  border-color: var(--brand-line);
-  box-shadow:
-    inset 0 4px 0 var(--brand),
-    var(--shadow);
-}
-
-.timeline-swipe-card[data-swipe='delete'] {
-  border-color: color-mix(in srgb, var(--danger) 48%, var(--line));
-  box-shadow:
-    inset 0 -4px 0 var(--danger),
-    var(--shadow);
-}
-
-.vertical-photo-card:hover {
-  transform: translateY(-2px);
-}
-
-.vertical-photo-card img,
-.mini-photo-drop img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.vertical-photo-card strong {
-  position: absolute;
-  right: 10px;
-  bottom: 10px;
-  padding: 7px 9px;
-  color: var(--ink);
-  background: color-mix(in srgb, var(--surface) 88%, transparent);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  backdrop-filter: blur(12px);
-}
-
-.timeline-item time {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 820;
-}
-
-.add-photo-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 232px;
-  aspect-ratio: 3 / 4;
-  color: var(--brand-ink);
-  background: var(--brand-soft);
-  border: 1px dashed var(--brand-line);
-  border-radius: 8px;
-  cursor: pointer;
-}
-
-.add-checkin {
-  display: grid;
-  gap: 10px;
-  width: 244px;
-  padding: 12px;
-}
-
-.timeline-edit-form {
-  width: 244px;
-}
-
-.mini-photo-drop {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  aspect-ratio: 3 / 4;
-  overflow: hidden;
-  color: var(--muted);
-  background: var(--field);
-  border: 1px dashed var(--line-strong);
-  border-radius: 8px;
-  cursor: pointer;
-}
-
 .field {
   display: grid;
   gap: 6px;
@@ -1312,7 +1166,7 @@ button:not(:disabled) {
 
 .primary-button {
   width: 100%;
-  color: #ffffff;
+  color: var(--on-brand);
   background: var(--brand);
   border: 1px solid var(--brand);
 }
@@ -1481,7 +1335,7 @@ button:not(:disabled):active {
 
 @keyframes workoutStart {
   0% {
-    border-color: var(--brand-line);
+    border-color: var(--line);
     box-shadow: 0 0 0 0 color-mix(in srgb, var(--brand) 24%, transparent);
     transform: scale(0.985);
   }
@@ -1677,8 +1531,7 @@ button:not(:disabled):active {
     padding: 12px 12px calc(98px + env(safe-area-inset-bottom));
   }
 
-  .main-training:not(.main-focus),
-  .main-timeline {
+  .main-training:not(.main-focus) {
     min-height: calc(100svh - 160px - env(safe-area-inset-bottom));
   }
 
@@ -2142,68 +1995,6 @@ button:not(:disabled):active {
     font-size: 11px;
   }
 
-  .timeline-horizontal {
-    width: calc(100% + 24px);
-    margin-inline: -12px;
-    padding: 8px 0 20px;
-    overflow-x: auto;
-    overscroll-behavior-x: contain;
-    scrollbar-width: none;
-  }
-
-  .timeline-horizontal::-webkit-scrollbar {
-    display: none;
-  }
-
-  .timeline-track {
-    gap: 18px;
-    padding: 24px 18px 8px;
-  }
-
-  .timeline-track::before {
-    top: 24px;
-    right: 18px;
-    left: 18px;
-  }
-
-  .timeline-item {
-    gap: 8px;
-    width: min(252px, 76vw);
-  }
-
-  .timeline-item.add-item,
-  .add-checkin,
-  .timeline-edit-form {
-    width: min(252px, 76vw);
-  }
-
-  .vertical-photo-card,
-  .add-photo-button {
-    width: min(232px, 70vw);
-    border-radius: 16px;
-  }
-
-  .vertical-photo-card strong {
-    right: 8px;
-    bottom: 8px;
-    padding: 6px 8px;
-    font-size: 12px;
-  }
-
-  .add-checkin {
-    gap: 9px;
-    padding: 10px;
-    border-radius: 16px;
-  }
-
-  .add-checkin input {
-    height: 40px;
-  }
-
-  .mini-photo-drop {
-    border-radius: 10px;
-  }
-
 }
 
 @media (max-width: 360px) {
@@ -2228,22 +2019,37 @@ button:not(:disabled):active {
     gap: 5px;
   }
 
-  .timeline-horizontal {
-    width: calc(100% + 20px);
-    margin-inline: -10px;
-    padding-left: 0;
+}
+
+@media (max-width: 620px) {
+  .surface,
+  .routine-home-panel,
+  .routine-form,
+  .workout-head,
+  .exercise-block,
+  .cardio-block,
+  .set-line,
+  .history-calendar,
+  .calendar-workout,
+  .detail-exercise,
+  .detail-set-value,
+  .editor-exercise,
+  .editor-cardio,
+  .editor-set {
+    border-radius: 10px;
   }
 
-  .timeline-item,
-  .vertical-photo-card,
-  .add-photo-button {
-    width: min(222px, 72vw);
+  .sync-panel,
+  .tabs,
+  .tab,
+  .primary-button,
+  .secondary-button,
+  .ghost-button,
+  .finish-button,
+  .icon-button,
+  .complete-toggle,
+  input,
+  select {
+    border-radius: 8px;
   }
-
-  .timeline-item.add-item,
-  .add-checkin,
-  .timeline-edit-form {
-    width: min(230px, 74vw);
-  }
-
 }

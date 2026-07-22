@@ -1,12 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type {
   CSSProperties,
-  ChangeEvent,
   Dispatch,
   FocusEvent as ReactFocusEvent,
   FormEvent,
-  MouseEvent as ReactMouseEvent,
-  PointerEvent as ReactPointerEvent,
   ReactNode,
   SetStateAction,
 } from 'react'
@@ -15,7 +12,6 @@ import {
   ArrowLeft,
   ArrowDown,
   ArrowUp,
-  Camera,
   Check,
   CheckCircle2,
   ChevronLeft,
@@ -40,7 +36,7 @@ import {
 import type { LucideIcon } from 'lucide-react'
 import './App.css'
 import { initialState } from './sampleData'
-import { loadLocalState, readPhotoAsDataUrl, saveLocalState } from './storage'
+import { loadLocalState, saveLocalState } from './storage'
 import {
   getSession,
   isSupabaseConfigured,
@@ -61,7 +57,6 @@ import {
   formatDuration,
   formatMonthKey,
   formatNumber,
-  formatShortDate,
   formatTime,
   getFireLevel,
   getFlexibleTrainingStreak,
@@ -74,7 +69,6 @@ import type {
   ActiveWorkout,
   AppState,
   CardioSession,
-  CheckIn,
   Routine,
   RoutineDraftExercise,
   TabKey,
@@ -121,12 +115,6 @@ type WorkoutDraft = {
   cardio: CardioSession
 }
 
-type CheckInDraft = {
-  date: string
-  weight: number
-  photo: string
-}
-
 type FinishSummary = {
   id: string
   message: string
@@ -163,7 +151,6 @@ const numericInputProps = {
 const navItems: { key: TabKey; label: string; icon: LucideIcon }[] = [
   { key: 'training', label: 'Training', icon: Dumbbell },
   { key: 'history', label: 'Historial', icon: History },
-  { key: 'timeline', label: 'Timeline', icon: Camera },
 ]
 
 const brandMarkSrc = `${import.meta.env.BASE_URL}app-icon-192.png`
@@ -328,129 +315,11 @@ const formatCardioNumber = (value: number | null | undefined, suffix: string) =>
   value === null || value === undefined ? '--' : `${formatNumber(value)} ${suffix}`
 
 const hasUserData = (value: AppState) =>
-  Boolean(value.checkIns.length || value.routines.length || value.workouts.length || value.activeWorkout)
+  Boolean(value.routines.length || value.workouts.length || value.activeWorkout)
 
 const vibrate = (pattern: number | number[] = 10) => {
   if ('vibrate' in navigator) {
     navigator.vibrate(pattern)
-  }
-}
-
-const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
-
-function useSwipeAction({
-  axis,
-  onDelete,
-  onEdit,
-  threshold = 72,
-}: {
-  axis: 'x' | 'y'
-  onDelete: () => void
-  onEdit: () => void
-  threshold?: number
-}) {
-  const startRef = useRef({ x: 0, y: 0, active: false, locked: false })
-  const offsetRef = useRef(0)
-  const suppressClickRef = useRef(false)
-  const [offset, setOffset] = useState(0)
-
-  const reset = () => {
-    offsetRef.current = 0
-    setOffset(0)
-  }
-
-  const onPointerDown = (event: ReactPointerEvent<HTMLElement>) => {
-    if (event.button !== 0) {
-      return
-    }
-
-    startRef.current = { x: event.clientX, y: event.clientY, active: true, locked: false }
-    offsetRef.current = 0
-    event.currentTarget.setPointerCapture(event.pointerId)
-  }
-
-  const onPointerMove = (event: ReactPointerEvent<HTMLElement>) => {
-    const start = startRef.current
-    if (!start.active) {
-      return
-    }
-
-    const deltaX = event.clientX - start.x
-    const deltaY = event.clientY - start.y
-    const primary = axis === 'x' ? deltaX : deltaY
-    const secondary = axis === 'x' ? deltaY : deltaX
-
-    if (!start.locked && Math.abs(primary) < 10) {
-      return
-    }
-
-    if (Math.abs(primary) <= Math.abs(secondary) * 1.15) {
-      return
-    }
-
-    start.locked = true
-    event.preventDefault()
-    const nextOffset = clamp(primary, -96, 96)
-    offsetRef.current = nextOffset
-    setOffset(nextOffset)
-  }
-
-  const completeGesture = () => {
-    const currentOffset = offsetRef.current
-    const shouldDelete = currentOffset <= -threshold
-    const shouldEdit = currentOffset >= threshold
-    startRef.current = { ...startRef.current, active: false, locked: false }
-
-    if (shouldDelete || shouldEdit) {
-      suppressClickRef.current = true
-      vibrate(18)
-      if (shouldDelete) {
-        onDelete()
-      } else {
-        onEdit()
-      }
-    }
-
-    reset()
-  }
-
-  const onPointerUp = (event: ReactPointerEvent<HTMLElement>) => {
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId)
-    }
-    completeGesture()
-  }
-
-  const onPointerCancel = () => {
-    startRef.current = { ...startRef.current, active: false, locked: false }
-    reset()
-  }
-
-  const onClickCapture = (event: ReactMouseEvent<HTMLElement>) => {
-    if (!suppressClickRef.current) {
-      return
-    }
-
-    event.preventDefault()
-    event.stopPropagation()
-    suppressClickRef.current = false
-  }
-
-  return {
-    className: offset ? 'dragging' : '',
-    intent: Math.abs(offset) > 22 ? (offset < 0 ? 'delete' : 'edit') : undefined,
-    style: offset
-      ? ({
-          transform: axis === 'x' ? `translate3d(${offset}px, 0, 0)` : `translate3d(0, ${offset}px, 0)`,
-        } as CSSProperties)
-      : undefined,
-    handlers: {
-      onClickCapture,
-      onPointerCancel,
-      onPointerDown,
-      onPointerMove,
-      onPointerUp,
-    },
   }
 }
 
@@ -491,12 +360,6 @@ function App() {
   const [selectedHistoryId, setSelectedHistoryId] = useState('')
   const [editingWorkoutId, setEditingWorkoutId] = useState('')
   const [now, setNow] = useState(() => Date.now())
-  const [isAddingCheckIn, setIsAddingCheckIn] = useState(false)
-  const [editingCheckInId, setEditingCheckInId] = useState('')
-  const [checkInDraft, setCheckInDraft] = useState({
-    weight: initialState.checkIns.at(-1)?.weight ?? 80,
-    photo: '',
-  })
   const [routineDraft, setRoutineDraft] = useState<RoutineDraft>(() => routineToDraft())
   const activeWorkoutId = state.activeWorkout?.id
   const trainingPhrase = trainingPhrases[trainingPhraseIndex]
@@ -506,11 +369,6 @@ function App() {
     setState(savedState)
     setSelectedRoutineId(savedState.routines[0]?.id ?? '')
     setSelectedHistoryId('')
-
-    const latestCheckIn = [...savedState.checkIns].sort((a, b) => b.date.localeCompare(a.date))[0]
-    if (latestCheckIn) {
-      setCheckInDraft((draft) => ({ ...draft, weight: latestCheckIn.weight }))
-    }
   }, [])
 
   const loadRemoteStateWithRetry = useCallback(async (userId: string) => {
@@ -759,10 +617,6 @@ function App() {
     return () => window.clearInterval(interval)
   }, [activeTab, activeWorkoutId, trainingMode])
 
-  const sortedCheckIns = useMemo(
-    () => [...state.checkIns].sort((a, b) => a.date.localeCompare(b.date)),
-    [state.checkIns],
-  )
   const sortedWorkouts = useMemo(
     () =>
       [...state.workouts].sort(
@@ -932,57 +786,6 @@ function App() {
     setSession(null)
     setSyncStatus('local')
     setSyncPassword('')
-  }
-
-  const addCheckIn = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-
-    const entry: CheckIn = {
-      id: createId('checkin'),
-      date: todayIso(),
-      weight: Number(checkInDraft.weight),
-      photo: checkInDraft.photo || undefined,
-    }
-
-    setState((current) => ({
-      ...current,
-      checkIns: [entry, ...current.checkIns.filter((checkIn) => checkIn.date !== entry.date)],
-    }))
-    setCheckInDraft((draft) => ({ ...draft, photo: '' }))
-    setIsAddingCheckIn(false)
-    vibrate(18)
-  }
-
-  const updateCheckIn = (entry: CheckIn) => {
-    setState((current) => ({
-      ...current,
-      checkIns: [entry, ...current.checkIns.filter((checkIn) => checkIn.id !== entry.id && checkIn.date !== entry.date)],
-    }))
-    setEditingCheckInId('')
-    vibrate(18)
-  }
-
-  const deleteCheckIn = (id: string) => {
-    if (!window.confirm('Eliminar esta entrada del timeline?')) {
-      return
-    }
-
-    setState((current) => ({
-      ...current,
-      checkIns: current.checkIns.filter((checkIn) => checkIn.id !== id),
-    }))
-    setEditingCheckInId('')
-    vibrate([12, 24, 12])
-  }
-
-  const handlePhotoUpload = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) {
-      return
-    }
-
-    const photo = await readPhotoAsDataUrl(file)
-    setCheckInDraft((draft) => ({ ...draft, photo }))
   }
 
   const saveRoutine = (event: FormEvent<HTMLFormElement>) => {
@@ -1351,22 +1154,6 @@ function App() {
             setSelectedWorkoutId={setSelectedHistoryId}
             updateWorkout={updateWorkout}
             workouts={sortedWorkouts}
-          />
-        )}
-
-        {activeTab === 'timeline' && (
-          <TimelineView
-            checkInDraft={checkInDraft}
-            checkIns={sortedCheckIns}
-            deleteCheckIn={deleteCheckIn}
-            editingCheckInId={editingCheckInId}
-            handlePhotoUpload={handlePhotoUpload}
-            isAdding={isAddingCheckIn}
-            onSubmit={addCheckIn}
-            setEditingCheckInId={setEditingCheckInId}
-            setCheckInDraft={setCheckInDraft}
-            setIsAdding={setIsAddingCheckIn}
-            updateCheckIn={updateCheckIn}
           />
         )}
 
@@ -2556,250 +2343,6 @@ function WorkoutEditor({
       <div className="editor-actions">
         <button className="secondary-button" type="button" onClick={onCancel}>
           Cancelar
-        </button>
-        <button className="primary-button compact" type="submit">
-          <Save size={17} />
-          Guardar
-        </button>
-      </div>
-    </form>
-  )
-}
-
-function TimelineView({
-  checkInDraft,
-  checkIns,
-  deleteCheckIn,
-  editingCheckInId,
-  handlePhotoUpload,
-  isAdding,
-  onSubmit,
-  setEditingCheckInId,
-  setCheckInDraft,
-  setIsAdding,
-  updateCheckIn,
-}: {
-  checkInDraft: { weight: number; photo: string }
-  checkIns: CheckIn[]
-  deleteCheckIn: (id: string) => void
-  editingCheckInId: string
-  handlePhotoUpload: (event: ChangeEvent<HTMLInputElement>) => void
-  isAdding: boolean
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void
-  setEditingCheckInId: Dispatch<SetStateAction<string>>
-  setCheckInDraft: Dispatch<SetStateAction<{ weight: number; photo: string }>>
-  setIsAdding: Dispatch<SetStateAction<boolean>>
-  updateCheckIn: (entry: CheckIn) => void
-}) {
-  return (
-    <section className="timeline-horizontal enter">
-      <div className="timeline-track">
-        {checkIns.map((checkIn) => (
-          <TimelineCheckInItem
-            checkIn={checkIn}
-            deleteCheckIn={deleteCheckIn}
-            editingCheckInId={editingCheckInId}
-            key={checkIn.id}
-            setEditingCheckInId={setEditingCheckInId}
-            setIsAdding={setIsAdding}
-            updateCheckIn={updateCheckIn}
-          />
-        ))}
-
-        <article className="timeline-item add-item">
-          <div className="timeline-dot add" />
-          {isAdding ? (
-            <form className="surface add-checkin" onSubmit={onSubmit}>
-              <label className="mini-photo-drop" data-tooltip="Foto">
-                {checkInDraft.photo ? <img alt="Foto seleccionada" src={checkInDraft.photo} /> : <Camera size={26} />}
-                <input accept="image/*" hidden type="file" onChange={handlePhotoUpload} />
-              </label>
-              <Field label="Peso">
-                <input
-                  {...numericInputProps}
-                  autoFocus
-                  inputMode="decimal"
-                  min="0"
-                  required
-                  step="0.1"
-                  type="number"
-                  value={checkInDraft.weight}
-                  onChange={(event) => setCheckInDraft((draft) => ({ ...draft, weight: Number(event.target.value) }))}
-                />
-              </Field>
-              <div className="button-row">
-                <button
-                  aria-label="Cancelar"
-                  className="secondary-button"
-                  type="button"
-                  onClick={() => {
-                    vibrate(8)
-                    setIsAdding(false)
-                  }}
-                >
-                  <ArrowLeft size={17} />
-                </button>
-                <button className="primary-button compact" type="submit">
-                  <Save size={17} />
-                  Guardar
-                </button>
-              </div>
-            </form>
-          ) : (
-            <button
-              aria-label="Agregar foto y peso"
-              className="add-photo-button"
-              type="button"
-              onClick={() => {
-                vibrate(10)
-                setEditingCheckInId('')
-                setIsAdding(true)
-              }}
-            >
-              <Plus size={26} />
-            </button>
-          )}
-          <time>{isAdding ? formatShortDate(todayIso()) : 'Nuevo'}</time>
-        </article>
-      </div>
-    </section>
-  )
-}
-
-function TimelineCheckInItem({
-  checkIn,
-  deleteCheckIn,
-  editingCheckInId,
-  setEditingCheckInId,
-  setIsAdding,
-  updateCheckIn,
-}: {
-  checkIn: CheckIn
-  deleteCheckIn: (id: string) => void
-  editingCheckInId: string
-  setEditingCheckInId: Dispatch<SetStateAction<string>>
-  setIsAdding: Dispatch<SetStateAction<boolean>>
-  updateCheckIn: (entry: CheckIn) => void
-}) {
-  const isEditing = editingCheckInId === checkIn.id
-  const openEditor = () => {
-    vibrate(10)
-    setIsAdding(false)
-    setEditingCheckInId(checkIn.id)
-  }
-  const swipe = useSwipeAction({
-    axis: 'y',
-    onDelete: () => deleteCheckIn(checkIn.id),
-    onEdit: openEditor,
-  })
-
-  return (
-    <article className="timeline-item">
-      <div className="timeline-dot" />
-      {isEditing ? (
-        <CheckInEditor key={checkIn.id} checkIn={checkIn} onCancel={() => setEditingCheckInId('')} onSave={updateCheckIn} />
-      ) : (
-        <>
-          <div
-            className={['vertical-photo-card timeline-swipe-card', swipe.className].filter(Boolean).join(' ')}
-            data-swipe={swipe.intent}
-            style={swipe.style}
-            {...swipe.handlers}
-          >
-            <div className="timeline-actions">
-              <button
-                aria-label="Editar entrada"
-                className="icon-button glass"
-                data-tooltip="Editar"
-                type="button"
-                onClick={openEditor}
-              >
-                <Pencil size={15} />
-              </button>
-              <button
-                aria-label="Eliminar entrada"
-                className="icon-button glass danger-text"
-                data-tooltip="Eliminar"
-                type="button"
-                onClick={() => deleteCheckIn(checkIn.id)}
-              >
-                <Trash2 size={15} />
-              </button>
-            </div>
-            {checkIn.photo ? <img alt={`Foto ${formatDate(checkIn.date)}`} src={checkIn.photo} /> : <Camera size={32} />}
-            <strong>{formatNumber(checkIn.weight)} kg</strong>
-          </div>
-          <time>{formatShortDate(checkIn.date)}</time>
-        </>
-      )}
-    </article>
-  )
-}
-
-function CheckInEditor({
-  checkIn,
-  onCancel,
-  onSave,
-}: {
-  checkIn: CheckIn
-  onCancel: () => void
-  onSave: (entry: CheckIn) => void
-}) {
-  const [draft, setDraft] = useState<CheckInDraft>(() => ({
-    date: checkIn.date,
-    weight: checkIn.weight,
-    photo: checkIn.photo ?? '',
-  }))
-
-  const uploadPhoto = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) {
-      return
-    }
-
-    const photo = await readPhotoAsDataUrl(file)
-    setDraft((current) => ({ ...current, photo }))
-  }
-
-  const submit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    onSave({
-      id: checkIn.id,
-      date: draft.date,
-      weight: Number(draft.weight),
-      photo: draft.photo || undefined,
-    })
-  }
-
-  return (
-    <form className="surface add-checkin timeline-edit-form" onSubmit={submit}>
-      <label className="mini-photo-drop" data-tooltip="Foto">
-        {draft.photo ? <img alt="Foto seleccionada" src={draft.photo} /> : <Camera size={26} />}
-        <input accept="image/*" hidden type="file" onChange={uploadPhoto} />
-      </label>
-      <Field label="Fecha">
-        <input
-          required
-          type="date"
-          value={draft.date}
-          onChange={(event) => setDraft((current) => ({ ...current, date: event.target.value }))}
-        />
-      </Field>
-      <Field label="Peso">
-        <input
-          {...numericInputProps}
-          inputMode="decimal"
-          min="0"
-          required
-          step="0.1"
-          type="number"
-          value={draft.weight}
-          onChange={(event) => setDraft((current) => ({ ...current, weight: Number(event.target.value) }))}
-        />
-      </Field>
-      <div className="button-row">
-        <button aria-label="Cancelar" className="secondary-button" type="button" onClick={onCancel}>
-          <ArrowLeft size={17} />
         </button>
         <button className="primary-button compact" type="submit">
           <Save size={17} />

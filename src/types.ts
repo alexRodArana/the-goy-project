@@ -1,13 +1,6 @@
-export type TabKey = 'training' | 'history' | 'timeline'
+export type TabKey = 'training' | 'history'
 
 export type ThemeMode = 'light' | 'dark'
-
-export type CheckIn = {
-  id: string
-  date: string
-  weight: number
-  photo?: string
-}
 
 export type RoutineExercise = {
   id: string
@@ -59,7 +52,6 @@ export type Workout = ActiveWorkout & {
 }
 
 export type AppState = {
-  checkIns: CheckIn[]
   routines: Routine[]
   workouts: Workout[]
   activeWorkout?: ActiveWorkout

@@ -194,10 +194,11 @@ export const saveRemoteState = async (userId: string, state: AppState) => {
   }
 
   const sharedState = isRecord(data?.state) ? data.state : {}
-  const nextState = {
+  const nextState: Record<string, unknown> = {
     ...sharedState,
     ...state,
   }
+  delete nextState.checkIns
 
   const { error } = await supabase.from(SHARED_TABLE).upsert(
     {

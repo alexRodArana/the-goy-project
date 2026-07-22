@@ -2,8 +2,6 @@
   --bg: #f5f7fb;
   --brand: #12945f;
   --brand-ink: #0f6f49;
-  --brand-line: #a7dcc2;
-  --brand-soft: #e5f7ed;
   --danger: #be4b49;
   --field: #f8fafc;
   --focus: rgba(18, 148, 95, 0.16);
@@ -13,17 +11,13 @@
   --line: #dce5f0;
   --line-strong: #cbd5e1;
   --muted: #64748b;
-  --ok: #167a54;
-  --ok-line: #98d2b5;
-  --ok-soft: #e3f6eb;
+  --on-brand: #ffffff;
   --segmented: #eef3f8;
-  --shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
-  --shadow-soft: 0 6px 14px rgba(15, 23, 42, 0.05);
+  --shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+  --shadow-soft: 0 1px 2px rgba(15, 23, 42, 0.05);
   --surface: #ffffff;
   --tooltip: #1d252b;
   --tooltip-ink: #ffffff;
-  --wash-a: rgba(18, 148, 95, 0.1);
-  --wash-b: rgba(37, 99, 235, 0.07);
 
   color: var(--ink);
   background: var(--bg);
@@ -43,8 +37,6 @@
   --bg: #101417;
   --brand: #39b980;
   --brand-ink: #bdf5d8;
-  --brand-line: rgba(77, 199, 136, 0.38);
-  --brand-soft: rgba(57, 185, 128, 0.13);
   --danger: #d65f5d;
   --field: #171d21;
   --focus: rgba(57, 185, 128, 0.18);
@@ -54,17 +46,13 @@
   --line: #273139;
   --line-strong: #35414a;
   --muted: #9ca8b1;
-  --ok: #56d794;
-  --ok-line: rgba(86, 215, 148, 0.38);
-  --ok-soft: rgba(86, 215, 148, 0.12);
+  --on-brand: #101417;
   --segmented: #161d21;
-  --shadow: 0 16px 38px rgba(0, 0, 0, 0.22);
-  --shadow-soft: 0 8px 18px rgba(0, 0, 0, 0.2);
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
+  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.2);
   --surface: #151b1f;
   --tooltip: #edf2f5;
   --tooltip-ink: #101417;
-  --wash-a: rgba(57, 185, 128, 0.11);
-  --wash-b: rgba(122, 168, 255, 0.1);
 
   color-scheme: dark;
 }
@@ -72,101 +60,61 @@
 :root[data-accent='green'] {
   --brand: #12945f;
   --brand-ink: #0f6f49;
-  --brand-line: #a7dcc2;
-  --brand-soft: #e5f7ed;
   --focus: rgba(18, 148, 95, 0.16);
-  --wash-a: rgba(18, 148, 95, 0.1);
-  --wash-b: rgba(37, 99, 235, 0.07);
 }
 
 :root[data-theme='dark'][data-accent='green'] {
   --brand: #39b980;
   --brand-ink: #bdf5d8;
-  --brand-line: rgba(77, 199, 136, 0.38);
-  --brand-soft: rgba(57, 185, 128, 0.13);
   --focus: rgba(57, 185, 128, 0.18);
-  --wash-a: rgba(57, 185, 128, 0.11);
-  --wash-b: rgba(122, 168, 255, 0.1);
 }
 
 :root[data-accent='blue'] {
   --brand: #2563eb;
   --brand-ink: #1d4ed8;
-  --brand-line: #b9cdfd;
-  --brand-soft: #e8f0ff;
   --focus: rgba(37, 99, 235, 0.16);
-  --wash-a: rgba(37, 99, 235, 0.12);
-  --wash-b: rgba(14, 165, 233, 0.08);
 }
 
 :root[data-theme='dark'][data-accent='blue'] {
   --brand: #7aa8ff;
   --brand-ink: #d9e6ff;
-  --brand-line: rgba(122, 168, 255, 0.42);
-  --brand-soft: rgba(122, 168, 255, 0.14);
   --focus: rgba(122, 168, 255, 0.18);
-  --wash-a: rgba(122, 168, 255, 0.1);
-  --wash-b: rgba(57, 185, 128, 0.08);
 }
 
 :root[data-accent='purple'] {
   --brand: #7c3aed;
   --brand-ink: #6d28d9;
-  --brand-line: #d6c4fb;
-  --brand-soft: #f1eaff;
   --focus: rgba(124, 58, 237, 0.16);
-  --wash-a: rgba(124, 58, 237, 0.1);
-  --wash-b: rgba(8, 145, 178, 0.08);
 }
 
 :root[data-theme='dark'][data-accent='purple'] {
   --brand: #a78bfa;
   --brand-ink: #eee8ff;
-  --brand-line: rgba(167, 139, 250, 0.42);
-  --brand-soft: rgba(167, 139, 250, 0.14);
   --focus: rgba(167, 139, 250, 0.18);
-  --wash-a: rgba(167, 139, 250, 0.1);
-  --wash-b: rgba(103, 232, 249, 0.08);
 }
 
 :root[data-accent='orange'] {
   --brand: #d97706;
   --brand-ink: #a85603;
-  --brand-line: #f4c27a;
-  --brand-soft: #fff3dc;
   --focus: rgba(217, 119, 6, 0.16);
-  --wash-a: rgba(217, 119, 6, 0.1);
-  --wash-b: rgba(37, 99, 235, 0.07);
 }
 
 :root[data-theme='dark'][data-accent='orange'] {
   --brand: #fbbf24;
   --brand-ink: #fff2bd;
-  --brand-line: rgba(251, 191, 36, 0.42);
-  --brand-soft: rgba(251, 191, 36, 0.14);
   --focus: rgba(251, 191, 36, 0.18);
-  --wash-a: rgba(251, 191, 36, 0.09);
-  --wash-b: rgba(122, 168, 255, 0.08);
 }
 
 :root[data-accent='rose'] {
   --brand: #be185d;
   --brand-ink: #9f1239;
-  --brand-line: #f4b6cf;
-  --brand-soft: #ffe7f0;
   --focus: rgba(190, 24, 93, 0.16);
-  --wash-a: rgba(190, 24, 93, 0.09);
-  --wash-b: rgba(37, 99, 235, 0.07);
 }
 
 :root[data-theme='dark'][data-accent='rose'] {
   --brand: #f472b6;
   --brand-ink: #ffe0f0;
-  --brand-line: rgba(244, 114, 182, 0.42);
-  --brand-soft: rgba(244, 114, 182, 0.14);
   --focus: rgba(244, 114, 182, 0.18);
-  --wash-a: rgba(244, 114, 182, 0.09);
-  --wash-b: rgba(122, 168, 255, 0.08);
 }
 
 * {

@@ -1,5 +1,5 @@
 import { initialState } from './sampleData'
-import type { ActiveWorkout, AppState, CardioSession, CheckIn, Routine, TrainingExercise, Workout } from './types'
+import type { ActiveWorkout, AppState, CardioSession, Routine, TrainingExercise, Workout } from './types'
 
 const DB_NAME = 'the-goy-project-db-v2'
 const DB_VERSION = 1
@@ -38,22 +38,6 @@ const normalizeCardio = (value: unknown): CardioSession => {
     durationMinutes: normalizeNullableNumber(value.durationMinutes ?? value.time ?? value.minutes),
     completed: Boolean(value.completed),
   }
-}
-
-const normalizeCheckIns = (value: unknown): CheckIn[] => {
-  if (!Array.isArray(value)) {
-    return initialState.checkIns
-  }
-
-  return value
-    .filter(isRecord)
-    .map((checkIn, index) => ({
-      id: String(checkIn.id ?? `checkin-${index + 1}`),
-      date: String(checkIn.date ?? new Date().toISOString().slice(0, 10)),
-      weight: toNumber(checkIn.weight),
-      photo: typeof checkIn.photo === 'string' ? checkIn.photo : undefined,
-    }))
-    .filter((checkIn) => checkIn.date && checkIn.weight > 0)
 }
 
 const normalizeRoutines = (value: unknown): Routine[] => {
@@ -201,7 +185,6 @@ export const normalizeState = (value: unknown): AppState => {
   }
 
   return {
-    checkIns: normalizeCheckIns(value.checkIns),
     routines: normalizeRoutines(value.routines),
     workouts: normalizeWorkouts(value.workouts),
     activeWorkout: normalizeActiveWorkout(value.activeWorkout),
@@ -296,36 +279,4 @@ export const parseImportFile = (file: File) =>
 
     reader.onerror = () => reject(reader.error)
     reader.readAsText(file)
-  })
-
-export const readPhotoAsDataUrl = (file: File) =>
-  new Promise<string>((resolve, reject) => {
-    const reader = new FileReader()
-
-    reader.onload = () => {
-      const original = String(reader.result)
-      const image = new Image()
-
-      image.onload = () => {
-        const maxSize = 1200
-        const scale = Math.min(1, maxSize / Math.max(image.width, image.height))
-        const canvas = document.createElement('canvas')
-        canvas.width = Math.round(image.width * scale)
-        canvas.height = Math.round(image.height * scale)
-        const context = canvas.getContext('2d')
-
-        if (!context) {
-          resolve(original)
-          return
-        }
-
-        context.drawImage(image, 0, 0, canvas.width, canvas.height)
-        resolve(canvas.toDataURL('image/jpeg', 0.8))
-      }
-
-      image.onerror = () => resolve(original)
-      image.src = original
-    }
-    reader.onerror = () => reject(reader.error)
-    reader.readAsDataURL(file)
   })
