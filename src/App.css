@@ -5,8 +5,14 @@
     repeating-linear-gradient(
       180deg,
       transparent 0,
-      transparent 27px,
-      color-mix(in srgb, var(--line) 38%, transparent) 28px
+      transparent 23px,
+      color-mix(in srgb, var(--line) 44%, transparent) 24px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent 0,
+      transparent 31px,
+      color-mix(in srgb, var(--line) 18%, transparent) 32px
     ),
     linear-gradient(180deg, color-mix(in srgb, var(--surface) 10%, var(--bg)), var(--bg));
 }
@@ -35,7 +41,7 @@
   padding: 0;
   color: var(--ink);
   font: inherit;
-  font-weight: 850;
+  font-weight: 600;
   background: transparent;
   border: 0;
   cursor: pointer;
@@ -189,7 +195,7 @@ html:not([data-theme='dark']) .brand-mark img {
   color: var(--muted);
   font: inherit;
   font-size: 14px;
-  font-weight: 780;
+  font-weight: 600;
   background: transparent;
   border: 0;
   border-radius: 7px;
@@ -250,7 +256,7 @@ html:not([data-theme='dark']) .brand-mark img {
   padding: 8px 10px;
   color: var(--muted);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 600;
   background: color-mix(in srgb, var(--surface) 88%, transparent);
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -325,7 +331,7 @@ html:not([data-theme='dark']) .brand-mark img {
 .completion-banner strong {
   overflow: hidden;
   font-size: 14px;
-  font-weight: 900;
+  font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -333,7 +339,7 @@ html:not([data-theme='dark']) .brand-mark img {
 .completion-banner span {
   color: var(--muted);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .streak-flame {
@@ -411,19 +417,19 @@ html:not([data-theme='dark']) .brand-mark img {
 }
 
 .training-phrase {
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  height: 124px;
+  display: block;
+  min-height: 146px;
   max-width: 720px;
   margin: 0 auto;
-  overflow: hidden;
+  padding: 10px 0 8px;
+  overflow: visible;
   color: var(--ink);
-  font-size: clamp(24px, 8vw, 46px);
-  font-weight: 920;
-  line-height: 1.02;
+  font-size: clamp(23px, 7vw, 42px);
+  font-weight: 700;
+  line-height: 1.12;
   text-align: center;
   text-wrap: balance;
+  overflow-wrap: anywhere;
   animation: phraseIn 520ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
@@ -448,7 +454,7 @@ html:not([data-theme='dark']) .brand-mark img {
 .detail-head span {
   color: var(--muted);
   font-size: 12px;
-  font-weight: 760;
+  font-weight: 600;
 }
 
 .start-button {
@@ -466,7 +472,7 @@ html:not([data-theme='dark']) .brand-mark img {
   color: var(--on-brand);
   font: inherit;
   font-size: 16px;
-  font-weight: 900;
+  font-weight: 700;
   background: var(--brand);
   border: 1px solid transparent;
   border-radius: 8px;
@@ -607,7 +613,7 @@ html:not([data-theme='dark']) .brand-mark img {
 .workout-head small {
   color: var(--muted);
   font-size: 12px;
-  font-weight: 820;
+  font-weight: 600;
 }
 
 .workout-head small {
@@ -663,7 +669,7 @@ html:not([data-theme='dark']) .brand-mark img {
   height: 30px;
   color: var(--on-brand);
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 700;
   background: var(--brand);
   border: 1px solid transparent;
   border-radius: 8px;
@@ -752,7 +758,7 @@ html:not([data-theme='dark']) .brand-mark img {
   color: var(--muted);
   font: inherit;
   font-size: 14px;
-  font-weight: 850;
+  font-weight: 600;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -806,7 +812,7 @@ html:not([data-theme='dark']) .brand-mark img {
 .calendar-weekdays span {
   color: var(--muted);
   font-size: 11px;
-  font-weight: 900;
+  font-weight: 700;
   text-align: center;
 }
 
@@ -821,7 +827,7 @@ html:not([data-theme='dark']) .brand-mark img {
   color: var(--muted);
   font: inherit;
   font-size: 13px;
-  font-weight: 850;
+  font-weight: 600;
   background: var(--field);
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -1045,7 +1051,7 @@ html:not([data-theme='dark']) .brand-mark img {
   overflow: hidden;
   color: var(--ink);
   font-size: 14px;
-  font-weight: 760;
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
   background: var(--input);
@@ -1109,7 +1115,7 @@ html:not([data-theme='dark']) .brand-mark img {
   padding: 7px 9px;
   color: var(--muted);
   font-size: 13px;
-  font-weight: 760;
+  font-weight: 600;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 999px;
@@ -1130,7 +1136,7 @@ html:not([data-theme='dark']) .brand-mark img {
   padding: 7px 8px;
   color: var(--muted);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 999px;
@@ -1141,7 +1147,7 @@ html:not([data-theme='dark']) .brand-mark img {
   gap: 6px;
   color: var(--muted);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 input,
@@ -1153,7 +1159,7 @@ select {
   color: var(--ink);
   font: inherit;
   font-size: 14px;
-  font-weight: 650;
+  font-weight: 600;
   background: var(--input);
   border: 1px solid var(--line-strong);
   border-radius: 8px;
@@ -1193,7 +1199,7 @@ button:not(:disabled) {
   color: var(--ink);
   font: inherit;
   font-size: 14px;
-  font-weight: 850;
+  font-weight: 600;
   border-radius: 8px;
   cursor: pointer;
   transition:
@@ -1308,7 +1314,7 @@ button:not(:disabled):active {
   padding: 6px 8px;
   color: var(--tooltip-ink);
   font-size: 12px;
-  font-weight: 760;
+  font-weight: 600;
   line-height: 1.2;
   pointer-events: none;
   background: var(--tooltip);
@@ -1463,10 +1469,6 @@ button:not(:disabled):active {
 }
 
 @media (max-width: 620px) {
-  .app-shell {
-    background: var(--bg);
-  }
-
   .app-header {
     position: sticky;
     grid-template-columns: minmax(0, 1fr) auto;
@@ -1737,11 +1739,12 @@ button:not(:disabled):active {
   }
 
   .training-phrase {
-    align-items: flex-end;
-    height: 136px;
-    width: min(100%, 340px);
+    min-height: 166px;
+    width: min(100%, 360px);
     margin: 0 auto;
-    font-size: clamp(28px, 9vw, 38px);
+    padding-block: 12px;
+    font-size: clamp(24px, 7.8vw, 34px);
+    line-height: 1.14;
   }
 
   .routine-picker {
@@ -2107,4 +2110,49 @@ button:not(:disabled):active {
   select {
     border-radius: 8px;
   }
+}
+
+.brand-mark,
+.accent-menu,
+.accent-swatch,
+.account-status,
+.sync-panel,
+.completion-banner,
+.surface,
+.start-card,
+.routine-form,
+.workout-head,
+.exercise-block,
+.cardio-block,
+.set-line,
+.cardio-toggle,
+.history-calendar,
+.calendar-workout,
+.detail-set-value,
+.editor-exercise,
+.editor-cardio,
+.editor-set {
+  border-radius: 4px;
+}
+
+.tabs,
+.tab,
+.primary-button,
+.secondary-button,
+.ghost-button,
+.finish-button,
+.icon-button,
+.complete-toggle,
+input,
+select {
+  border-radius: 3px;
+}
+
+.exercise-block,
+.cardio-block,
+.calendar-workout,
+.editor-exercise,
+.editor-cardio {
+  content-visibility: auto;
+  contain-intrinsic-size: 96px;
 }
