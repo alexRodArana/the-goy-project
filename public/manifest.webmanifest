@@ -1,12 +1,12 @@
 {
   "name": "The Goy Project",
   "short_name": "Goy Project",
-  "description": "Registro personal de cambio fisico, entrenamientos, rutinas, peso y fotos diarias.",
+  "description": "Registro personal de entrenamientos, rutinas, series y progreso.",
   "start_url": ".",
   "scope": ".",
   "display": "standalone",
-  "background_color": "#f5f7fb",
-  "theme_color": "#f5f7fb",
+  "background_color": "#f5f6f8",
+  "theme_color": "#f5f6f8",
   "icons": [
     {
       "src": "app-icon-192.png",

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'the-goy-project-v6'
+const CACHE_NAME = 'the-goy-project-v7'
 const SCOPE = self.registration.scope
 const APP_SHELL = [
   SCOPE,

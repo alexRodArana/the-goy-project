@@ -518,7 +518,7 @@ function App() {
   useEffect(() => {
     document.documentElement.dataset.theme = theme
     localStorage.setItem('goy-theme', theme)
-    updateMetaContent('meta[name="theme-color"]', theme === 'dark' ? '#101417' : '#f5f7fb')
+    updateMetaContent('meta[name="theme-color"]', theme === 'dark' ? '#0d0f12' : '#f5f6f8')
     updateMetaContent('meta[name="apple-mobile-web-app-status-bar-style"]', theme === 'dark' ? 'black-translucent' : 'default')
   }, [theme])
 
