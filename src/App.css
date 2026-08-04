@@ -189,7 +189,7 @@ html:not([data-theme='dark']) .brand-mark img {
 }
 
 .tabs {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
   gap: 5px;
