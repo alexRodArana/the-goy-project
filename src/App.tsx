@@ -1969,7 +1969,7 @@ function HistoryCalendar({
         })}
       </div>
 
-      <div className="calendar-summary">
+      <div className="calendar-summary" key={selectedDate}>
         {selectedWorkouts.length ? (
           <div className="calendar-workouts">
             {selectedWorkouts.map((workout) => (

@@ -250,6 +250,11 @@ html:not([data-theme='dark']) .brand-mark img {
 
 .tab.active svg {
   transform: scale(1.08);
+  animation: tabIconIn 380ms var(--ease-snappy) both;
+}
+
+.tab.active span {
+  animation: tabLabelIn 340ms var(--ease-smooth) both;
 }
 
 .main {
@@ -515,6 +520,19 @@ html:not([data-theme='dark']) .brand-mark img {
   background: var(--field);
   border: 1px solid transparent;
   border-radius: 8px;
+  animation: listItemIn 380ms var(--ease-smooth) both;
+}
+
+.routine-row:nth-child(2) {
+  animation-delay: 40ms;
+}
+
+.routine-row:nth-child(3) {
+  animation-delay: 80ms;
+}
+
+.routine-row:nth-child(n + 4) {
+  animation-delay: 120ms;
 }
 
 .button-row,
@@ -585,6 +603,10 @@ html:not([data-theme='dark']) .brand-mark img {
   border-radius: inherit;
   box-shadow: 0 0 14px color-mix(in srgb, var(--brand) 28%, transparent);
   transition: width 500ms var(--ease-smooth);
+}
+
+.workout-progress span[style*='100%'] {
+  animation: progressComplete 620ms var(--ease-smooth);
 }
 
 .workout-head > div:first-child {
@@ -753,6 +775,12 @@ html:not([data-theme='dark']) .brand-mark img {
   border-color: transparent;
 }
 
+.set-line.complete .complete-toggle svg,
+.editor-set.complete .complete-toggle svg,
+.cardio-toggle.complete svg {
+  animation: checkPop 380ms var(--ease-snappy) both;
+}
+
 .cardio-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -907,6 +935,7 @@ html:not([data-theme='dark']) .brand-mark img {
   box-shadow:
     0 0 0 3px var(--focus),
     0 7px 18px color-mix(in srgb, var(--brand) 14%, transparent);
+  animation: calendarSelect 340ms var(--ease-snappy);
 }
 
 .calendar-day.selected:not(.trained) {
@@ -921,6 +950,7 @@ html:not([data-theme='dark']) .brand-mark img {
   min-height: 54px;
   padding-top: 12px;
   border-top: 1px solid var(--line);
+  animation: selectionIn 360ms var(--ease-smooth) both;
 }
 
 .calendar-summary > strong {
@@ -941,10 +971,23 @@ html:not([data-theme='dark']) .brand-mark img {
   background: var(--field);
   border: 1px solid transparent;
   border-radius: 8px;
+  animation: listItemIn 380ms var(--ease-smooth) both;
   transition:
     background 280ms var(--ease-smooth),
     border-color 240ms ease,
     box-shadow 320ms var(--ease-smooth);
+}
+
+.calendar-workout:nth-child(2) {
+  animation-delay: 40ms;
+}
+
+.calendar-workout:nth-child(3) {
+  animation-delay: 80ms;
+}
+
+.calendar-workout:nth-child(n + 4) {
+  animation-delay: 120ms;
 }
 
 .calendar-workout.expanded {
@@ -1017,6 +1060,19 @@ html:not([data-theme='dark']) .brand-mark img {
   background: var(--field);
   border: 1px solid transparent;
   border-radius: 8px;
+  animation: listItemIn 380ms var(--ease-smooth) both;
+}
+
+.editor-exercise:nth-child(2) {
+  animation-delay: 40ms;
+}
+
+.editor-exercise:nth-child(3) {
+  animation-delay: 80ms;
+}
+
+.editor-exercise:nth-child(n + 4) {
+  animation-delay: 120ms;
 }
 
 .editor-head {
@@ -1344,6 +1400,10 @@ select:focus-visible {
   transform: translate(-50%, 0) scale(1);
 }
 
+.header-actions > .icon-button:last-child svg {
+  animation: controlIconIn 360ms var(--ease-snappy) both;
+}
+
 @keyframes headerIn {
   from {
     opacity: 0;
@@ -1462,6 +1522,100 @@ select:focus-visible {
   }
   100% {
     transform: scale(1);
+  }
+}
+
+@keyframes tabIconIn {
+  0% {
+    opacity: 0.55;
+    transform: translateY(3px) scale(0.82);
+  }
+  65% {
+    transform: translateY(-1px) scale(1.14);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1.08);
+  }
+}
+
+@keyframes tabLabelIn {
+  from {
+    opacity: 0.62;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes checkPop {
+  0% {
+    opacity: 0;
+    transform: rotate(-18deg) scale(0.55);
+  }
+  62% {
+    transform: rotate(3deg) scale(1.16);
+  }
+  100% {
+    opacity: 1;
+    transform: rotate(0) scale(1);
+  }
+}
+
+@keyframes selectionIn {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes listItemIn {
+  from {
+    opacity: 0;
+    transform: translateY(7px) scale(0.992);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes calendarSelect {
+  0% {
+    transform: scale(0.94);
+  }
+  68% {
+    transform: scale(1.045);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes progressComplete {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.24) saturate(1.08);
+  }
+}
+
+@keyframes controlIconIn {
+  from {
+    opacity: 0;
+    transform: rotate(-20deg) scale(0.78);
+  }
+  to {
+    opacity: 1;
+    transform: rotate(0) scale(1);
   }
 }
 
