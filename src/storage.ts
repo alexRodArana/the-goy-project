@@ -191,17 +191,36 @@ export const normalizeState = (value: unknown): AppState => {
   }
 }
 
-const openDatabase = () =>
-  new Promise<IDBDatabase>((resolve, reject) => {
+let databasePromise: Promise<IDBDatabase> | undefined
+
+const openDatabase = () => {
+  if (databasePromise) {
+    return databasePromise
+  }
+
+  databasePromise = new Promise<IDBDatabase>((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION)
 
     request.onupgradeneeded = () => {
       request.result.createObjectStore(STORE_NAME)
     }
 
-    request.onsuccess = () => resolve(request.result)
-    request.onerror = () => reject(request.error)
+    request.onsuccess = () => {
+      const database = request.result
+      database.onversionchange = () => {
+        database.close()
+        databasePromise = undefined
+      }
+      resolve(database)
+    }
+    request.onerror = () => {
+      databasePromise = undefined
+      reject(request.error)
+    }
   })
+
+  return databasePromise
+}
 
 const runTransaction = async <T>(
   mode: IDBTransactionMode,
@@ -213,18 +232,19 @@ const runTransaction = async <T>(
     const transaction = db.transaction(STORE_NAME, mode)
     const store = transaction.objectStore(STORE_NAME)
     const request = action(store)
+    let result!: T
 
-    request.onsuccess = () => resolve(request.result)
-    request.onerror = () => reject(request.error)
-    transaction.oncomplete = () => db.close()
-    transaction.onerror = () => {
-      db.close()
-      reject(transaction.error)
+    request.onsuccess = () => {
+      result = request.result
     }
+    request.onerror = () => reject(request.error)
+    transaction.oncomplete = () => resolve(result)
+    transaction.onerror = () => reject(transaction.error)
+    transaction.onabort = () => reject(transaction.error)
   })
 }
 
-export const loadState = async (): Promise<AppState> => {
+export const loadLocalState = async (): Promise<AppState> => {
   if (!('indexedDB' in window)) {
     return initialState
   }
@@ -241,42 +261,10 @@ export const loadState = async (): Promise<AppState> => {
   }
 }
 
-export const loadLocalState = loadState
-
-export const saveState = async (state: AppState) => {
+export const saveLocalState = async (state: AppState) => {
   if (!('indexedDB' in window)) {
     return
   }
 
   await runTransaction<IDBValidKey>('readwrite', (store) => store.put(state, STATE_KEY))
 }
-
-export const saveLocalState = saveState
-
-export const exportState = (state: AppState) => {
-  const blob = new Blob([JSON.stringify(state, null, 2)], {
-    type: 'application/json',
-  })
-  const url = URL.createObjectURL(blob)
-  const anchor = document.createElement('a')
-  anchor.href = url
-  anchor.download = `the-goy-project-${new Date().toISOString().slice(0, 10)}.json`
-  anchor.click()
-  URL.revokeObjectURL(url)
-}
-
-export const parseImportFile = (file: File) =>
-  new Promise<AppState>((resolve, reject) => {
-    const reader = new FileReader()
-
-    reader.onload = () => {
-      try {
-        resolve(normalizeState(JSON.parse(String(reader.result))))
-      } catch (error) {
-        reject(error)
-      }
-    }
-
-    reader.onerror = () => reject(reader.error)
-    reader.readAsText(file)
-  })

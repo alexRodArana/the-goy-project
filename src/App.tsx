@@ -326,9 +326,13 @@ const vibrate = (pattern: number | number[] = 10) => {
 function App() {
   const [state, setState] = useState<AppState>(initialState)
   const stateRef = useRef(state)
+  const sessionRef = useRef<SyncSession | null>(null)
   const authHydrationRef = useRef(0)
   const initialAuthHandledRef = useRef(false)
   const isHydratingRef = useRef(false)
+  const remoteSaveQueueRef = useRef<Promise<void>>(Promise.resolve())
+  const remoteSaveRevisionRef = useRef(0)
+  const remoteSyncedStateRef = useRef<AppState | undefined>(undefined)
   const [isLoaded, setIsLoaded] = useState(false)
   const [session, setSession] = useState<SyncSession | null>(null)
   const [syncEmail, setSyncEmail] = useState('')
@@ -359,7 +363,6 @@ function App() {
   const [editingRoutineId, setEditingRoutineId] = useState('')
   const [selectedHistoryId, setSelectedHistoryId] = useState('')
   const [editingWorkoutId, setEditingWorkoutId] = useState('')
-  const [now, setNow] = useState(() => Date.now())
   const [routineDraft, setRoutineDraft] = useState<RoutineDraft>(() => routineToDraft())
   const activeWorkoutId = state.activeWorkout?.id
   const trainingPhrase = trainingPhrases[trainingPhraseIndex]
@@ -371,13 +374,13 @@ function App() {
     setSelectedHistoryId('')
   }, [])
 
-  const loadRemoteStateWithRetry = useCallback(async (userId: string) => {
+  const loadRemoteStateWithRetry = useCallback(async () => {
     try {
-      return await loadRemoteState(userId)
+      return await loadRemoteState()
     } catch (error) {
       await wait(500)
       try {
-        return await loadRemoteState(userId)
+        return await loadRemoteState()
       } catch {
         throw error
       }
@@ -391,7 +394,7 @@ function App() {
     setSyncStatus('loading')
 
     try {
-      const remoteState = await loadRemoteStateWithRetry(nextSession.user.id)
+      const remoteState = await loadRemoteStateWithRetry()
       if (authHydrationRef.current !== token) {
         return
       }
@@ -410,8 +413,9 @@ function App() {
       }
 
       if (shouldBootstrapRemote) {
-        await saveRemoteState(nextSession.user.id, nextState)
+        await saveRemoteState(nextState)
       }
+      remoteSyncedStateRef.current = nextState
     } finally {
       if (authHydrationRef.current === token) {
         isHydratingRef.current = false
@@ -516,6 +520,10 @@ function App() {
   }, [state])
 
   useEffect(() => {
+    sessionRef.current = session
+  }, [session])
+
+  useEffect(() => {
     document.documentElement.dataset.theme = theme
     localStorage.setItem('goy-theme', theme)
     updateMetaContent('meta[name="theme-color"]', theme === 'dark' ? '#0d0f12' : '#f5f6f8')
@@ -539,36 +547,64 @@ function App() {
     }
 
     const timeout = window.setTimeout(() => {
-      const persist = async () => {
-        try {
-          await saveLocalState(state)
-          if (session) {
-            await saveRemoteState(session.user.id, state)
-            setSyncStatus('synced')
-          } else {
-            setSyncStatus('local')
-          }
-        } catch (error) {
-          console.error('Could not save state', error)
-          setSyncStatus('error')
-          setSyncMessage('No se pudo guardar.')
-        }
-      }
-
-      persist()
-    }, 220)
+      void saveLocalState(state).catch((error) => {
+        console.error('Could not save local state', error)
+        setSyncStatus('error')
+        setSyncMessage('No se pudo guardar localmente.')
+      })
+    }, 100)
 
     return () => window.clearTimeout(timeout)
-  }, [isLoaded, session, state])
+  }, [isLoaded, state])
 
   useEffect(() => {
-    if (!activeWorkoutId) {
+    if (!isLoaded || isHydratingRef.current) {
       return
     }
 
-    const interval = window.setInterval(() => setNow(Date.now()), 1000)
-    return () => window.clearInterval(interval)
-  }, [activeWorkoutId])
+    if (!session) {
+      remoteSaveRevisionRef.current += 1
+      remoteSyncedStateRef.current = undefined
+      return
+    }
+
+    if (state === remoteSyncedStateRef.current) {
+      return
+    }
+
+    const targetUserId = session.user.id
+    const timeout = window.setTimeout(() => {
+      const revision = remoteSaveRevisionRef.current + 1
+      remoteSaveRevisionRef.current = revision
+      const pendingSave = remoteSaveQueueRef.current.catch(() => undefined).then(async () => {
+        if (sessionRef.current?.user.id !== targetUserId) {
+          return
+        }
+        await saveRemoteState(state, remoteSyncedStateRef.current)
+        if (sessionRef.current?.user.id === targetUserId) {
+          remoteSyncedStateRef.current = state
+        }
+      })
+      remoteSaveQueueRef.current = pendingSave
+
+      void pendingSave
+        .then(() => {
+          if (remoteSaveRevisionRef.current === revision) {
+            setSyncStatus('synced')
+            setSyncMessage('')
+          }
+        })
+        .catch((error) => {
+          if (remoteSaveRevisionRef.current === revision) {
+            console.error('Could not save remote state', error)
+            setSyncStatus('error')
+            setSyncMessage('No se pudo sincronizar.')
+          }
+        })
+    }, 500)
+
+    return () => window.clearTimeout(timeout)
+  }, [isLoaded, session, state])
 
   useEffect(() => {
     if (syncCooldown <= 0) {
@@ -626,9 +662,6 @@ function App() {
   )
   const selectedRoutine = state.routines.find((routine) => routine.id === selectedRoutineId) ?? state.routines[0]
   const selectedHistoryWorkout = sortedWorkouts.find((workout) => workout.id === selectedHistoryId)
-  const elapsedSeconds = state.activeWorkout
-    ? Math.floor((now - new Date(state.activeWorkout.startedAt).getTime()) / 1000)
-    : 0
   const activeRoutineId = state.activeWorkout?.routineId
   const activeRoutineName = state.activeWorkout?.routineName
   const previousWorkoutForActive = useMemo(() => {
@@ -882,7 +915,6 @@ function App() {
       cardio: emptyCardio(),
     }
 
-    setNow(Date.now())
     setFinishSummary(null)
     setIsWorkoutStarting(true)
     setTrainingMode('home')
@@ -1124,7 +1156,6 @@ function App() {
             createRoutine={createRoutine}
             deleteSelectedRoutine={deleteSelectedRoutine}
             editSelectedRoutine={editSelectedRoutine}
-            elapsedSeconds={elapsedSeconds}
             finishWorkout={finishWorkout}
             mode={trainingMode}
             previousWorkout={previousWorkoutForActive}
@@ -1162,12 +1193,24 @@ function App() {
   )
 }
 
+function ElapsedTime({ startedAt }: { startedAt: string }) {
+  const [now, setNow] = useState(() => Date.now())
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(interval)
+  }, [startedAt])
+
+  const startTime = new Date(startedAt).getTime()
+  const elapsedSeconds = Number.isNaN(startTime) ? 0 : Math.max(0, Math.floor((now - startTime) / 1000))
+  return <>{formatDuration(elapsedSeconds)}</>
+}
+
 function TrainingView({
   activeWorkout,
   createRoutine,
   deleteSelectedRoutine,
   editSelectedRoutine,
-  elapsedSeconds,
   finishWorkout,
   isWorkoutStarting,
   mode,
@@ -1190,7 +1233,6 @@ function TrainingView({
   createRoutine: () => void
   deleteSelectedRoutine: () => void
   editSelectedRoutine: () => void
-  elapsedSeconds: number
   finishWorkout: () => void
   isWorkoutStarting: boolean
   mode: RoutineMode
@@ -1237,7 +1279,7 @@ function TrainingView({
             <span>{activeWorkout.routineName}</span>
             <strong>
               <Timer size={18} />
-              {formatDuration(elapsedSeconds)}
+              <ElapsedTime startedAt={activeWorkout.startedAt} />
             </strong>
             <small>
               {completedSets}/{totalSets} series

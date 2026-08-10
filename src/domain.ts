@@ -7,26 +7,41 @@ export type CalendarDay = {
   workouts: Workout[]
 }
 
-export const toDateKey = (date: Date) =>
+const dateFormatter = new Intl.DateTimeFormat('es-MX', {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+})
+
+const timeFormatter = new Intl.DateTimeFormat('es-MX', {
+  hour: '2-digit',
+  hour12: false,
+  minute: '2-digit',
+})
+
+const monthFormatter = new Intl.DateTimeFormat('es-MX', {
+  month: 'long',
+  year: 'numeric',
+})
+
+const compactNumberFormatter = new Intl.NumberFormat('es-MX', { maximumFractionDigits: 0 })
+const decimalNumberFormatter = new Intl.NumberFormat('es-MX', { maximumFractionDigits: 1 })
+
+const toDateKey = (date: Date) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 
 export const todayIso = () => toDateKey(new Date())
 
-export const toLocalDate = (value: string) => new Date(`${value}T12:00:00`)
+const toLocalDate = (value: string) => new Date(`${value}T12:00:00`)
 
-export const toMonthKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+const toMonthKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
 
 export const getWorkoutStartDate = (workout: Workout) => {
   const startedAt = new Date(workout.startedAt)
   return Number.isNaN(startedAt.getTime()) ? workout.date : toDateKey(startedAt)
 }
 
-export const formatDate = (value: string) =>
-  new Intl.DateTimeFormat('es-MX', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  }).format(toLocalDate(value))
+export const formatDate = (value: string) => dateFormatter.format(toLocalDate(value))
 
 export const formatTime = (value: string) => {
   const date = new Date(value)
@@ -34,31 +49,16 @@ export const formatTime = (value: string) => {
     return '--:--'
   }
 
-  return new Intl.DateTimeFormat('es-MX', {
-    hour: '2-digit',
-    hour12: false,
-    minute: '2-digit',
-  }).format(date)
+  return timeFormatter.format(date)
 }
 
-export const formatShortDate = (value: string) =>
-  new Intl.DateTimeFormat('es-MX', {
-    day: 'numeric',
-    month: 'short',
-  }).format(toLocalDate(value))
-
-export const formatMonth = (value: string) => {
-  const label = new Intl.DateTimeFormat('es-MX', {
-    month: 'long',
-    year: 'numeric',
-  }).format(toLocalDate(value))
+const formatMonth = (value: string) => {
+  const label = monthFormatter.format(toLocalDate(value))
   return `${label.charAt(0).toUpperCase()}${label.slice(1)}`
 }
 
 export const formatNumber = (value: number) =>
-  new Intl.NumberFormat('es-MX', {
-    maximumFractionDigits: value >= 100 ? 0 : 1,
-  }).format(value)
+  (value >= 100 ? compactNumberFormatter : decimalNumberFormatter).format(value)
 
 export const formatDuration = (seconds: number) => {
   const safeSeconds = Math.max(0, Math.floor(seconds))
@@ -79,7 +79,7 @@ export const addMonths = (monthKey: string, offset: number) => {
 
 export const formatMonthKey = (monthKey: string) => formatMonth(`${monthKey}-01`)
 
-export const dayDifference = (laterDate: string, earlierDate: string) =>
+const dayDifference = (laterDate: string, earlierDate: string) =>
   Math.round((toLocalDate(laterDate).getTime() - toLocalDate(earlierDate).getTime()) / 86_400_000)
 
 export const getFlexibleTrainingStreak = (workouts: Workout[], referenceDate = todayIso()) => {

@@ -21,10 +21,7 @@ const isValidUrl = (value: unknown) => {
 }
 
 const canInitializeSupabase = isValidUrl(supabaseUrl) && Boolean(supabaseAnonKey)
-const SHARED_TABLE = 'goy_app_state'
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null
+const TRAINING_STATE_KEYS = ['routines', 'workouts', 'activeWorkout']
 
 const getAuthRedirectUrl = () => {
   const redirectUrl = new URL(window.location.pathname || '/', window.location.origin)
@@ -46,7 +43,7 @@ const getSupabaseErrorMessage = (error: unknown) => {
   return 'Error desconocido de Supabase'
 }
 
-export const supabase = (() => {
+const supabase = (() => {
   if (!canInitializeSupabase) {
     return null
   }
@@ -164,52 +161,46 @@ export const signOut = async () => {
   }
 }
 
-export const loadRemoteState = async (userId: string): Promise<AppState> => {
+export const loadRemoteState = async (): Promise<AppState> => {
   if (!supabase) {
     return initialState
   }
 
-  const { data, error } = await supabase
-    .from(SHARED_TABLE)
-    .select('state')
-    .eq('user_id', userId)
-    .maybeSingle()
+  const { data, error } = await supabase.rpc('get_goy_app_state_sections', {
+    p_keys: TRAINING_STATE_KEYS,
+  })
 
   if (error) {
     throw error
   }
 
-  return normalizeState(data?.state ?? initialState)
+  return normalizeState(data ?? initialState)
 }
 
-export const saveRemoteState = async (userId: string, state: AppState) => {
+export const saveRemoteState = async (state: AppState, previousState?: AppState) => {
   if (!supabase) {
     return
   }
 
-  const { data, error: readError } = await supabase.from(SHARED_TABLE).select('state').eq('user_id', userId).maybeSingle()
-
-  if (readError) {
-    throw readError
+  const patch: Record<string, unknown> = {}
+  if (!previousState || state.routines !== previousState.routines) {
+    patch.routines = state.routines
+  }
+  if (!previousState || state.workouts !== previousState.workouts) {
+    patch.workouts = state.workouts
+  }
+  if (!previousState || state.activeWorkout !== previousState.activeWorkout) {
+    patch.activeWorkout = state.activeWorkout ?? null
   }
 
-  const sharedState = isRecord(data?.state) ? data.state : {}
-  const nextState: Record<string, unknown> = {
-    ...sharedState,
-    ...state,
+  if (!Object.keys(patch).length) {
+    return
   }
-  delete nextState.checkIns
 
-  const { error } = await supabase.from(SHARED_TABLE).upsert(
-    {
-      user_id: userId,
-      state: nextState,
-      updated_at: new Date().toISOString(),
-    },
-    {
-      onConflict: 'user_id',
-    },
-  )
+  const { error } = await supabase.rpc('merge_goy_app_state', {
+    p_patch: patch,
+    p_remove_keys: ['checkIns'],
+  })
 
   if (error) {
     throw error
