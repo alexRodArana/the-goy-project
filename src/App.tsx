@@ -1153,6 +1153,7 @@ function App() {
         {activeTab === 'training' && (
           <TrainingView
             activeWorkout={state.activeWorkout}
+            cardioEnabled={state.cardioEnabled}
             createRoutine={createRoutine}
             deleteSelectedRoutine={deleteSelectedRoutine}
             editSelectedRoutine={editSelectedRoutine}
@@ -1208,6 +1209,7 @@ function ElapsedTime({ startedAt }: { startedAt: string }) {
 
 function TrainingView({
   activeWorkout,
+  cardioEnabled,
   createRoutine,
   deleteSelectedRoutine,
   editSelectedRoutine,
@@ -1230,6 +1232,7 @@ function TrainingView({
   updateTrainingSet,
 }: {
   activeWorkout?: ActiveWorkout
+  cardioEnabled: boolean
   createRoutine: () => void
   deleteSelectedRoutine: () => void
   editSelectedRoutine: () => void
@@ -1380,72 +1383,74 @@ function TrainingView({
             )
           })}
 
-          <article className={activeWorkout.cardio.completed ? 'cardio-block complete' : 'cardio-block'}>
-            <div className="exercise-title">
-              <span>
-                <Activity size={16} />
-              </span>
-              <h2>Cardio</h2>
-            </div>
-            <div className="cardio-grid">
-              <Field label="Inclinacion">
-                <input
-                  {...numericInputProps}
-                  aria-label="Inclinacion"
-                  inputMode="decimal"
-                  min="0"
-                  placeholder="%"
-                  step="0.5"
-                  type="number"
-                  value={activeWorkout.cardio.incline ?? ''}
-                  onChange={(event) =>
-                    updateCardio('incline', event.target.value === '' ? null : Number(event.target.value))
-                  }
-                />
-              </Field>
-              <Field label="Velocidad">
-                <input
-                  {...numericInputProps}
-                  aria-label="Velocidad"
-                  inputMode="decimal"
-                  min="0"
-                  placeholder="km/h"
-                  step="0.1"
-                  type="number"
-                  value={activeWorkout.cardio.speed ?? ''}
-                  onChange={(event) =>
-                    updateCardio('speed', event.target.value === '' ? null : Number(event.target.value))
-                  }
-                />
-              </Field>
-              <Field label="Tiempo">
-                <input
-                  {...numericInputProps}
-                  aria-label="Tiempo de cardio"
-                  inputMode="numeric"
-                  min="0"
-                  placeholder="min"
-                  step="1"
-                  type="number"
-                  value={activeWorkout.cardio.durationMinutes ?? ''}
-                  onChange={(event) =>
-                    updateCardio('durationMinutes', event.target.value === '' ? null : Number(event.target.value))
-                  }
-                />
-              </Field>
-            </div>
-            <button
-              className={activeWorkout.cardio.completed ? 'cardio-toggle complete' : 'cardio-toggle'}
-              type="button"
-              onClick={() => {
-                vibrate(8)
-                updateCardio('completed', !activeWorkout.cardio.completed)
-              }}
-            >
-              {activeWorkout.cardio.completed ? <CheckCircle2 size={18} /> : <Check size={18} />}
-              Cardio listo
-            </button>
-          </article>
+          {cardioEnabled && (
+            <article className={activeWorkout.cardio.completed ? 'cardio-block complete' : 'cardio-block'}>
+              <div className="exercise-title">
+                <span>
+                  <Activity size={16} />
+                </span>
+                <h2>Cardio</h2>
+              </div>
+              <div className="cardio-grid">
+                <Field label="Inclinacion">
+                  <input
+                    {...numericInputProps}
+                    aria-label="Inclinacion"
+                    inputMode="decimal"
+                    min="0"
+                    placeholder="%"
+                    step="0.5"
+                    type="number"
+                    value={activeWorkout.cardio.incline ?? ''}
+                    onChange={(event) =>
+                      updateCardio('incline', event.target.value === '' ? null : Number(event.target.value))
+                    }
+                  />
+                </Field>
+                <Field label="Velocidad">
+                  <input
+                    {...numericInputProps}
+                    aria-label="Velocidad"
+                    inputMode="decimal"
+                    min="0"
+                    placeholder="km/h"
+                    step="0.1"
+                    type="number"
+                    value={activeWorkout.cardio.speed ?? ''}
+                    onChange={(event) =>
+                      updateCardio('speed', event.target.value === '' ? null : Number(event.target.value))
+                    }
+                  />
+                </Field>
+                <Field label="Tiempo">
+                  <input
+                    {...numericInputProps}
+                    aria-label="Tiempo de cardio"
+                    inputMode="numeric"
+                    min="0"
+                    placeholder="min"
+                    step="1"
+                    type="number"
+                    value={activeWorkout.cardio.durationMinutes ?? ''}
+                    onChange={(event) =>
+                      updateCardio('durationMinutes', event.target.value === '' ? null : Number(event.target.value))
+                    }
+                  />
+                </Field>
+              </div>
+              <button
+                className={activeWorkout.cardio.completed ? 'cardio-toggle complete' : 'cardio-toggle'}
+                type="button"
+                onClick={() => {
+                  vibrate(8)
+                  updateCardio('completed', !activeWorkout.cardio.completed)
+                }}
+              >
+                {activeWorkout.cardio.completed ? <CheckCircle2 size={18} /> : <Check size={18} />}
+                Cardio listo
+              </button>
+            </article>
+          )}
         </div>
       </section>
     )

@@ -52,6 +52,7 @@ export type Workout = ActiveWorkout & {
 }
 
 export type AppState = {
+  cardioEnabled: boolean
   routines: Routine[]
   workouts: Workout[]
   activeWorkout?: ActiveWorkout

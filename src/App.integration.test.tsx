@@ -5,6 +5,7 @@ import type { AppState } from './types'
 const { testState } = vi.hoisted(() => {
   const state: AppState = {
     activeWorkout: undefined,
+    cardioEnabled: false,
     routines: [
       {
         days: ['Lunes'],
@@ -114,5 +115,16 @@ describe('App history calendar', () => {
     await waitFor(() => {
       expect(screen.queryByText(/Duracion 00:47:00/i)).not.toBeInTheDocument()
     })
+  })
+
+  it('does not append cardio when it is disabled for the account', async () => {
+    window.location.hash = '#training'
+    const { default: App } = await import('./App')
+
+    render(<App />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Iniciar' }))
+
+    expect(await screen.findByRole('heading', { name: 'Press banca' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Cardio' })).not.toBeInTheDocument()
   })
 })

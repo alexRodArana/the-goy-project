@@ -185,6 +185,7 @@ export const normalizeState = (value: unknown): AppState => {
   }
 
   return {
+    cardioEnabled: value.cardioEnabled !== false,
     routines: normalizeRoutines(value.routines),
     workouts: normalizeWorkouts(value.workouts),
     activeWorkout: normalizeActiveWorkout(value.activeWorkout),
