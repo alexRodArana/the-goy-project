@@ -6,6 +6,7 @@ const { testState } = vi.hoisted(() => {
   const state: AppState = {
     activeWorkout: undefined,
     cardioEnabled: false,
+    routineRotation: ['routine-1', 'routine-2'],
     routines: [
       {
         days: ['Lunes'],
@@ -18,6 +19,18 @@ const { testState } = vi.hoisted(() => {
         ],
         id: 'routine-1',
         name: 'Push Kosher',
+      },
+      {
+        days: ['Martes'],
+        exercises: [
+          {
+            id: 'routine-exercise-2',
+            name: 'Jalon al pecho',
+            sets: 2,
+          },
+        ],
+        id: 'routine-2',
+        name: 'Pull Kosher',
       },
     ],
     workouts: [
@@ -86,7 +99,7 @@ vi.mock('./supabase', () => ({
   updatePassword: vi.fn(async () => undefined),
 }))
 
-describe('App history calendar', () => {
+describe('App training and history', () => {
   beforeEach(() => {
     window.location.hash = '#history'
     localStorage.setItem('goy-theme', 'dark')
@@ -122,9 +135,10 @@ describe('App history calendar', () => {
     const { default: App } = await import('./App')
 
     render(<App />)
+    await waitFor(() => expect(screen.getByRole('combobox')).toHaveValue('routine-2'))
     fireEvent.click(await screen.findByRole('button', { name: 'Iniciar' }))
 
-    expect(await screen.findByRole('heading', { name: 'Press banca' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Jalon al pecho' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Cardio' })).not.toBeInTheDocument()
   })
 })

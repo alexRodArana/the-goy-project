@@ -60,6 +60,7 @@ import {
   formatTime,
   getFireLevel,
   getFlexibleTrainingStreak,
+  getNextRoutineId,
   getWorkoutStartDate,
   normalizeName,
   todayIso,
@@ -370,7 +371,7 @@ function App() {
   const applyLoadedState = useCallback((savedState: AppState) => {
     stateRef.current = savedState
     setState(savedState)
-    setSelectedRoutineId(savedState.routines[0]?.id ?? '')
+    setSelectedRoutineId(getNextRoutineId(savedState.routines, savedState.routineRotation, savedState.workouts))
     setSelectedHistoryId('')
   }, [])
 
@@ -847,6 +848,8 @@ function App() {
 
     setState((current) => ({
       ...current,
+      routineRotation:
+        trainingMode === 'edit' ? current.routineRotation : [...current.routineRotation, routine.id],
       routines:
         trainingMode === 'edit'
           ? current.routines.map((item) => (item.id === routine.id ? routine : item))
@@ -864,22 +867,26 @@ function App() {
     }
 
     const nextRoutines = state.routines.filter((routine) => routine.id !== selectedRoutine.id)
+    const nextRotation = state.routineRotation.filter((routineId) => routineId !== selectedRoutine.id)
 
     setState((current) => ({
       ...current,
+      routineRotation: nextRotation,
       routines: current.routines.filter((routine) => routine.id !== selectedRoutine.id),
     }))
-    setSelectedRoutineId(nextRoutines[0]?.id ?? '')
+    setSelectedRoutineId(getNextRoutineId(nextRoutines, nextRotation, state.workouts))
     resetRoutineDraft()
     setTrainingMode('home')
     vibrate([12, 24, 12])
   }
 
   const updateWorkout = (workout: Workout) => {
+    const workouts = state.workouts.map((item) => (item.id === workout.id ? workout : item))
     setState((current) => ({
       ...current,
-      workouts: current.workouts.map((item) => (item.id === workout.id ? workout : item)),
+      workouts,
     }))
+    setSelectedRoutineId(getNextRoutineId(state.routines, state.routineRotation, workouts))
     setEditingWorkoutId('')
     setSelectedHistoryId(workout.id)
     vibrate(18)
@@ -890,10 +897,12 @@ function App() {
       return
     }
 
+    const workouts = state.workouts.filter((workout) => workout.id !== id)
     setState((current) => ({
       ...current,
-      workouts: current.workouts.filter((workout) => workout.id !== id),
+      workouts,
     }))
+    setSelectedRoutineId(getNextRoutineId(state.routines, state.routineRotation, workouts))
     setSelectedHistoryId('')
     setEditingWorkoutId('')
     vibrate([12, 24, 12])
@@ -1010,6 +1019,7 @@ function App() {
     const workouts = [workout, ...state.workouts]
     const streak = getFlexibleTrainingStreak(workouts, getWorkoutStartDate(workout))
     const message = completionMessages[Math.floor(Math.random() * completionMessages.length)]
+    const nextRoutineId = getNextRoutineId(state.routines, state.routineRotation, workouts)
 
     setIsFinishSummaryLeaving(false)
     setFinishSummary({ id: workout.id, message, streak })
@@ -1019,6 +1029,7 @@ function App() {
       workouts,
     }))
     setIsWorkoutStarting(false)
+    setSelectedRoutineId(nextRoutineId)
     setSelectedHistoryId(workout.id)
     setActiveTab('history')
     vibrate([18, 30, 22])

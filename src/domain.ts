@@ -1,4 +1,4 @@
-import type { Workout } from './types'
+import type { Routine, Workout } from './types'
 
 export type CalendarDay = {
   date: string
@@ -70,6 +70,57 @@ export const formatDuration = (seconds: number) => {
 }
 
 export const normalizeName = (value: string) => value.trim().toLocaleLowerCase('es-MX')
+
+const workoutMatchesRoutine = (workout: Workout, routine: Routine) =>
+  workout.routineId === routine.id || normalizeName(workout.routineName) === normalizeName(routine.name)
+
+export const getNextRoutineId = (routines: Routine[], routineRotation: string[], workouts: Workout[]) => {
+  const routinesById = new Map(routines.map((routine) => [routine.id, routine]))
+  const rotation = routineRotation.filter((routineId) => routinesById.has(routineId))
+
+  if (!rotation.length) {
+    return routines[0]?.id ?? ''
+  }
+
+  const recentWorkouts = [...workouts]
+    .sort(
+      (a, b) =>
+        getWorkoutStartDate(b).localeCompare(getWorkoutStartDate(a)) || b.startedAt.localeCompare(a.startedAt),
+    )
+    .filter((workout) => rotation.some((routineId) => workoutMatchesRoutine(workout, routinesById.get(routineId)!)))
+
+  const latestWorkout = recentWorkouts[0]
+  if (!latestWorkout) {
+    return rotation[0]
+  }
+
+  let bestIndex = -1
+  let bestScore = 0
+
+  rotation.forEach((routineId, candidateIndex) => {
+    const routine = routinesById.get(routineId)!
+    if (!workoutMatchesRoutine(latestWorkout, routine)) {
+      return
+    }
+
+    let score = 0
+    for (let historyIndex = 0; historyIndex < recentWorkouts.length; historyIndex += 1) {
+      const rotationIndex = (candidateIndex - historyIndex + rotation.length) % rotation.length
+      const expectedRoutine = routinesById.get(rotation[rotationIndex])!
+      if (!workoutMatchesRoutine(recentWorkouts[historyIndex], expectedRoutine)) {
+        break
+      }
+      score += 1
+    }
+
+    if (score > bestScore) {
+      bestIndex = candidateIndex
+      bestScore = score
+    }
+  })
+
+  return bestIndex >= 0 ? rotation[(bestIndex + 1) % rotation.length] : rotation[0]
+}
 
 export const addMonths = (monthKey: string, offset: number) => {
   const [year, month] = monthKey.split('-').map(Number)

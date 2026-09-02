@@ -21,7 +21,7 @@ const isValidUrl = (value: unknown) => {
 }
 
 const canInitializeSupabase = isValidUrl(supabaseUrl) && Boolean(supabaseAnonKey)
-const TRAINING_STATE_KEYS = ['routines', 'workouts', 'activeWorkout', 'cardioEnabled']
+const TRAINING_STATE_KEYS = ['routines', 'routineRotation', 'workouts', 'activeWorkout', 'cardioEnabled']
 
 const getAuthRedirectUrl = () => {
   const redirectUrl = new URL(window.location.pathname || '/', window.location.origin)
@@ -185,6 +185,9 @@ export const saveRemoteState = async (state: AppState, previousState?: AppState)
   const patch: Record<string, unknown> = {}
   if (!previousState || state.cardioEnabled !== previousState.cardioEnabled) {
     patch.cardioEnabled = state.cardioEnabled
+  }
+  if (!previousState || state.routineRotation !== previousState.routineRotation) {
+    patch.routineRotation = state.routineRotation
   }
   if (!previousState || state.routines !== previousState.routines) {
     patch.routines = state.routines

@@ -4,9 +4,10 @@ import {
   formatDuration,
   getFireLevel,
   getFlexibleTrainingStreak,
+  getNextRoutineId,
   getWorkoutStartDate,
 } from './domain'
-import type { Workout } from './types'
+import type { Routine, Workout } from './types'
 
 const makeWorkout = (patch: Partial<Workout> = {}): Workout => ({
   cardio: {
@@ -39,6 +40,24 @@ const makeWorkout = (patch: Partial<Workout> = {}): Workout => ({
   startedAt: '2026-07-10T13:00:00.000Z',
   ...patch,
 })
+
+const routines: Routine[] = ['push', 'pull', 'legs', 'torso', 'arms'].map((name) => ({
+  days: [],
+  exercises: [{ id: `${name}-exercise`, name: `${name} exercise`, sets: 1 }],
+  id: name,
+  name: `${name[0].toUpperCase()}${name.slice(1)}`,
+}))
+
+const rotation = ['push', 'pull', 'legs', 'torso', 'arms', 'legs']
+
+const rotationWorkout = (routineId: string, day: number) =>
+  makeWorkout({
+    date: `2026-07-${String(day).padStart(2, '0')}`,
+    id: `workout-${routineId}-${day}`,
+    routineId,
+    routineName: routines.find((routine) => routine.id === routineId)!.name,
+    startedAt: `2026-07-${String(day).padStart(2, '0')}T12:00:00.000Z`,
+  })
 
 describe('domain helpers', () => {
   it('groups calendar workouts by the workout start date', () => {
@@ -90,5 +109,29 @@ describe('domain helpers', () => {
     expect(getFireLevel(0)).toBe(0)
     expect(getFireLevel(1)).toBe(1)
     expect(getFireLevel(13)).toBe(5)
+  })
+
+  it('selects the next routine from a rotation', () => {
+    expect(getNextRoutineId(routines, rotation, [])).toBe('push')
+    expect(getNextRoutineId(routines, rotation, [rotationWorkout('push', 1)])).toBe('pull')
+    expect(getNextRoutineId(routines, rotation, [rotationWorkout('arms', 5)])).toBe('legs')
+  })
+
+  it('resolves both positions of a repeated Legs routine from recent history', () => {
+    expect(
+      getNextRoutineId(routines, rotation, [
+        rotationWorkout('legs', 3),
+        rotationWorkout('pull', 2),
+        rotationWorkout('push', 1),
+      ]),
+    ).toBe('torso')
+
+    expect(
+      getNextRoutineId(routines, rotation, [
+        rotationWorkout('legs', 6),
+        rotationWorkout('arms', 5),
+        rotationWorkout('torso', 4),
+      ]),
+    ).toBe('push')
   })
 })

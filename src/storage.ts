@@ -66,6 +66,12 @@ const normalizeRoutines = (value: unknown): Routine[] => {
   return routines.length ? routines : initialState.routines
 }
 
+const normalizeRoutineRotation = (value: unknown, routines: Routine[]) => {
+  const routineIds = new Set(routines.map((routine) => routine.id))
+  const rotation = toStringArray(value).filter((routineId) => routineIds.has(routineId))
+  return rotation.length ? rotation : routines.map((routine) => routine.id)
+}
+
 const normalizeExerciseSets = (
   exerciseId: string,
   rawSets: unknown,
@@ -184,9 +190,12 @@ export const normalizeState = (value: unknown): AppState => {
     return initialState
   }
 
+  const routines = normalizeRoutines(value.routines)
+
   return {
     cardioEnabled: value.cardioEnabled !== false,
-    routines: normalizeRoutines(value.routines),
+    routineRotation: normalizeRoutineRotation(value.routineRotation, routines),
+    routines,
     workouts: normalizeWorkouts(value.workouts),
     activeWorkout: normalizeActiveWorkout(value.activeWorkout),
   }
