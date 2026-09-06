@@ -8,7 +8,7 @@ const choices = [
   { mode: 'dark', label: 'Oscuro', icon: Moon },
 ] as const
 
-export function ThemeButton({ mode, onChange }: { mode: ThemeMode; onChange: (mode: ThemeMode) => void }) {
+export function ThemeButton({ mode, onChange, onOpen }: { mode: ThemeMode; onChange: (mode: ThemeMode) => void; onOpen: () => void }) {
   const [open, setOpen] = useState(false)
   const container = useRef<HTMLDivElement>(null)
   const trigger = useRef<HTMLButtonElement>(null)
@@ -36,7 +36,10 @@ export function ThemeButton({ mode, onChange }: { mode: ThemeMode; onChange: (mo
 
   return (
     <div className="theme-picker" ref={container}>
-      <button aria-label="Elegir tema" aria-haspopup="menu" aria-expanded={open} className="icon-button" data-tooltip="Tema" type="button" ref={trigger} onClick={() => setOpen((value) => !value)}>
+      <button aria-label="Elegir tema" aria-haspopup="menu" aria-expanded={open} className="icon-button" data-tooltip="Tema" type="button" ref={trigger} onClick={() => {
+        if (!open) onOpen()
+        setOpen((value) => !value)
+      }}>
         <Icon size={18} />
       </button>
       {open && (

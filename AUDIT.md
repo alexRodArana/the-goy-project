@@ -29,7 +29,7 @@ Fecha: 2026-09-06. Alcance: The Goy Project y Keep Slopping, React, persistencia
 ## Validacion
 - Training: 27 pruebas unitarias/integracion; Keep Slopping: 35.
 - Playwright: 10 escenarios por app, en iPhone/WebKit, Android/Chromium, iPad/WebKit, escritorio y telefono de 320 px. Creacion, guardado, datos anteriores, checklists, persistencia, no duplicacion de calorias, tema automatico, override manual y logos.
-- Comprobaciones axe sobre ambas pantallas iniciales en claro/oscuro, sin incidencias serias/criticas en el alcance probado.
+- Comprobaciones axe sobre ambas pantallas iniciales en claro/oscuro, entrenamiento activo, detalle del historial y editor de comidas, sin incidencias serias/criticas en el alcance probado. Se corrigio el contraste del boton Terminar en modo claro.
 - Script de produccion scripts/check-suite.mjs en Training: CSP, logos, configuracion publica, cambio compartido de tema/acento, caches separadas, recarga sin conexion en Chromium y recarga con servidor inaccesible en WebKit.
 - Pruebas SQL con dos usuarios sinteticos y roles authenticated/anon: aislamiento de cuentas, actualizaciones parciales, comidas no duplicadas, eliminacion acotada y rechazo de usuario incorrecto. Las pruebas se ejecutan en una transaccion que termina en rollback.
 - La migracion publicada cambia funciones/permisos/politicas, no los registros reales. La prueba posterior a la instalacion mantuvo las tres cuentas y la misma huella de datos antes/despues.
