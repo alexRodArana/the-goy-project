@@ -47,6 +47,15 @@ test('shared appearance, contrast, responsive layout and logo rendering', async 
     await page.getByRole('button', { name: 'Elegir color de acento' }).click()
     await page.getByRole('menuitemradio', { name: 'Color Azul' }).click()
     await expect(page.locator('html')).toHaveAttribute('data-accent', 'blue')
+    const ovalControls = await page.locator('.icon-button:not(.tiny), .account-status, .complete-toggle, .exercise-title > span').evaluateAll((nodes) =>
+      nodes.flatMap((node) => {
+        const { width, height } = node.getBoundingClientRect()
+        return width > 0 && height > 0 && Math.abs(width - height) > 0.5
+          ? [{ className: node.className, width, height }]
+          : []
+      }),
+    )
+    expect(ovalControls).toEqual([])
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
     expect(await page.locator('.brand-mark img').evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth === 192)).toBe(true)
     const findings = await new AxeBuilder({ page }).disableRules(['meta-viewport']).analyze()
