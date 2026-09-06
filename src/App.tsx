@@ -34,6 +34,7 @@ import {
 import type { LucideIcon } from 'lucide-react'
 import './App.css'
 import './suite.css'
+import { DecimalInput } from './DecimalInput'
 import { RotatingPhrase } from './RotatingPhrase'
 import { accentOptions, useAppearance } from './useAppearance'
 import { ThemeButton } from './ThemeButton'
@@ -1074,23 +1075,11 @@ function TrainingView({
                           {set.completed ? <CheckCircle2 size={18} /> : <Check size={18} />}
                         </button>
                         <strong>{set.setNumber}</strong>
-                        <input
-                          {...numericInputProps}
-                          aria-label="Peso"
-                          inputMode="decimal"
-                          min="0"
+                        <DecimalInput
+                          ariaLabel="Peso"
                           placeholder={weightPlaceholder}
-                          step="0.5"
-                          type="number"
-                          value={set.weight ?? ''}
-                          onChange={(event) =>
-                            updateTrainingSet(
-                              exercise.id,
-                              set.id,
-                              'weight',
-                              event.target.value === '' ? null : Number(event.target.value),
-                            )
-                          }
+                          value={set.weight}
+                          onValueChange={(value) => updateTrainingSet(exercise.id, set.id, 'weight', value)}
                         />
                         <input
                           {...numericInputProps}
@@ -1127,33 +1116,19 @@ function TrainingView({
               </div>
               <div className="cardio-grid">
                 <Field label="Inclinacion">
-                  <input
-                    {...numericInputProps}
-                    aria-label="Inclinacion"
-                    inputMode="decimal"
-                    min="0"
+                  <DecimalInput
+                    ariaLabel="Inclinacion"
                     placeholder="%"
-                    step="0.5"
-                    type="number"
-                    value={activeWorkout.cardio.incline ?? ''}
-                    onChange={(event) =>
-                      updateCardio('incline', event.target.value === '' ? null : Number(event.target.value))
-                    }
+                    value={activeWorkout.cardio.incline}
+                    onValueChange={(value) => updateCardio('incline', value)}
                   />
                 </Field>
                 <Field label="Velocidad">
-                  <input
-                    {...numericInputProps}
-                    aria-label="Velocidad"
-                    inputMode="decimal"
-                    min="0"
+                  <DecimalInput
+                    ariaLabel="Velocidad"
                     placeholder="km/h"
-                    step="0.1"
-                    type="number"
-                    value={activeWorkout.cardio.speed ?? ''}
-                    onChange={(event) =>
-                      updateCardio('speed', event.target.value === '' ? null : Number(event.target.value))
-                    }
+                    value={activeWorkout.cardio.speed}
+                    onValueChange={(value) => updateCardio('speed', value)}
                   />
                 </Field>
                 <Field label="Tiempo">
@@ -2008,16 +1983,11 @@ function WorkoutEditor({
                     {set.completed ? <CheckCircle2 size={16} /> : <Check size={16} />}
                   </button>
                   <strong>{set.setNumber}</strong>
-                  <input
-                    {...numericInputProps}
-                    aria-label="Peso"
-                    inputMode="decimal"
-                    min="0"
+                  <DecimalInput
+                    ariaLabel="Peso"
                     placeholder="kg"
-                    step="0.5"
-                    type="number"
-                    value={set.weight ?? ''}
-                    onChange={(event) => updateSet(exercise.id, set.id, { weight: event.target.value === '' ? null : Number(event.target.value) })}
+                    value={set.weight}
+                    onValueChange={(value) => updateSet(exercise.id, set.id, { weight: value })}
                   />
                   <input
                     {...numericInputProps}
@@ -2061,33 +2031,25 @@ function WorkoutEditor({
       <section className="editor-cardio">
         <div className="cardio-grid">
           <Field label="Inclinacion">
-            <input
-              {...numericInputProps}
-              inputMode="decimal"
-              min="0"
-              step="0.5"
-              type="number"
-              value={draft.cardio.incline ?? ''}
-              onChange={(event) =>
+            <DecimalInput
+              ariaLabel="Inclinacion"
+              value={draft.cardio.incline}
+              onValueChange={(value) =>
                 setDraft((current) => ({
                   ...current,
-                  cardio: { ...current.cardio, incline: event.target.value === '' ? null : Number(event.target.value) },
+                  cardio: { ...current.cardio, incline: value },
                 }))
               }
             />
           </Field>
           <Field label="Velocidad">
-            <input
-              {...numericInputProps}
-              inputMode="decimal"
-              min="0"
-              step="0.1"
-              type="number"
-              value={draft.cardio.speed ?? ''}
-              onChange={(event) =>
+            <DecimalInput
+              ariaLabel="Velocidad"
+              value={draft.cardio.speed}
+              onValueChange={(value) =>
                 setDraft((current) => ({
                   ...current,
-                  cardio: { ...current.cardio, speed: event.target.value === '' ? null : Number(event.target.value) },
+                  cardio: { ...current.cardio, speed: value },
                 }))
               }
             />
