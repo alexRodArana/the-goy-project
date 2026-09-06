@@ -1,3 +1,11 @@
+@font-face {
+  font-family: 'Manrope Variable';
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url('@fontsource-variable/manrope/files/manrope-latin-wght-normal.woff2') format('woff2');
+}
+
 :root {
   --bg: #f5f6f8;
   --brand: #16855b;
@@ -13,7 +21,7 @@
   --input: #ffffff;
   --line: #e7e9ed;
   --line-strong: #d9dde3;
-  --muted: #757b86;
+  --muted: #626a78;
   --on-brand: #ffffff;
   --segmented: #e9ebef;
   --shadow: 0 18px 48px rgba(24, 28, 36, 0.08), 0 2px 10px rgba(24, 28, 36, 0.04);
@@ -53,7 +61,7 @@
   --input: #1a1d22;
   --line: #25292f;
   --line-strong: #343941;
-  --muted: #949aa5;
+  --muted: #a1a7b2;
   --on-brand: #0d1712;
   --segmented: #1a1d22;
   --shadow: 0 20px 56px rgba(0, 0, 0, 0.32), 0 2px 12px rgba(0, 0, 0, 0.2);
@@ -82,7 +90,7 @@
 }
 
 :root[data-accent='blue'] {
-  --brand: #3979e9;
+  --brand: #2862cb;
   --brand-hover: #2866d4;
   --brand-ink: #245fc8;
   --focus: rgba(57, 121, 233, 0.16);
@@ -96,7 +104,7 @@
 }
 
 :root[data-accent='purple'] {
-  --brand: #8664df;
+  --brand: #7350c6;
   --brand-hover: #7350ce;
   --brand-ink: #6845c4;
   --focus: rgba(134, 100, 223, 0.17);
@@ -110,8 +118,8 @@
 }
 
 :root[data-accent='orange'] {
-  --brand: #e18231;
-  --brand-hover: #cb6e20;
+  --brand: #a95412;
+  --brand-hover: #954710;
   --brand-ink: #b75c16;
   --focus: rgba(225, 130, 49, 0.18);
 }
@@ -124,8 +132,8 @@
 }
 
 :root[data-accent='rose'] {
-  --brand: #dc5f8d;
-  --brand-hover: #c94b7a;
+  --brand: #b83667;
+  --brand-hover: #a62c59;
   --brand-ink: #b63a6a;
   --focus: rgba(220, 95, 141, 0.17);
 }
@@ -183,6 +191,27 @@ p {
 
 #root {
   min-height: 100svh;
+}
+
+.error-screen {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 20px;
+  min-height: 100svh;
+  padding: 24px;
+  text-align: center;
+}
+.error-screen h1 { font-size: 22px; }
+.error-screen button {
+  min-height: 44px;
+  padding: 10px 24px;
+  border: 0;
+  border-radius: 8px;
+  color: var(--on-brand);
+  background: var(--brand);
+  font: inherit;
+  cursor: pointer;
 }
 
 @media (max-width: 620px) {

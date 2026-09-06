@@ -71,6 +71,19 @@ export const formatDuration = (seconds: number) => {
 
 export const normalizeName = (value: string) => value.trim().toLocaleLowerCase('es-MX')
 
+export function getEditedWorkoutTiming(workout: Workout, date: string, durationMinutes: number) {
+  const start = new Date(workout.startedAt)
+  if (date !== getWorkoutStartDate(workout)) {
+    const [year, month, day] = date.split('-').map(Number)
+    start.setFullYear(year, month - 1, day)
+  }
+  const previousMinutes = Math.max(1, Math.round(workout.durationSeconds / 60))
+  const durationSeconds = durationMinutes === previousMinutes
+    ? workout.durationSeconds
+    : Math.max(1, Math.round(durationMinutes * 60))
+  return { startedAt: start.toISOString(), endedAt: new Date(start.getTime() + durationSeconds * 1000).toISOString(), durationSeconds }
+}
+
 const workoutMatchesRoutine = (workout: Workout, routine: Routine) =>
   workout.routineId === routine.id || normalizeName(workout.routineName) === normalizeName(routine.name)
 
@@ -105,7 +118,7 @@ export const getNextRoutineId = (routines: Routine[], routineRotation: string[],
 
     let score = 0
     for (let historyIndex = 0; historyIndex < recentWorkouts.length; historyIndex += 1) {
-      const rotationIndex = (candidateIndex - historyIndex + rotation.length) % rotation.length
+      const rotationIndex = ((candidateIndex - historyIndex) % rotation.length + rotation.length) % rotation.length
       const expectedRoutine = routinesById.get(rotation[rotationIndex])!
       if (!workoutMatchesRoutine(recentWorkouts[historyIndex], expectedRoutine)) {
         break

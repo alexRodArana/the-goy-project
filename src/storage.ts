@@ -57,7 +57,7 @@ const normalizeRoutines = (value: unknown): Routine[] => {
             .map((exercise, exerciseIndex) => ({
               id: String(exercise.id ?? `routine-${routineIndex + 1}-exercise-${exerciseIndex + 1}`),
               name: String(exercise.name ?? exercise.exerciseName ?? `Ejercicio ${exerciseIndex + 1}`),
-              sets: Math.max(1, toNumber(exercise.sets, 3)),
+              sets: Math.min(30, Math.max(1, Math.trunc(toNumber(exercise.sets, 3)))),
             }))
         : [],
     }))
@@ -269,12 +269,4 @@ export const loadLocalState = async (): Promise<AppState> => {
     console.error('Could not load local state', error)
     return initialState
   }
-}
-
-export const saveLocalState = async (state: AppState) => {
-  if (!('indexedDB' in window)) {
-    return
-  }
-
-  await runTransaction<IDBValidKey>('readwrite', (store) => store.put(state, STATE_KEY))
 }

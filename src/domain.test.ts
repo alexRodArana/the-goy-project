@@ -3,6 +3,7 @@ import {
   buildCalendarDays,
   formatDuration,
   getFireLevel,
+  getEditedWorkoutTiming,
   getFlexibleTrainingStreak,
   getNextRoutineId,
   getWorkoutStartDate,
@@ -133,5 +134,18 @@ describe('domain helpers', () => {
         rotationWorkout('torso', 4),
       ]),
     ).toBe('push')
+  })
+
+  it('keeps rotating after several complete cycles without a negative index', () => {
+    const history = Array.from({ length: 24 }, (_, index) => rotationWorkout(rotation[index % rotation.length], index + 1))
+    expect(getNextRoutineId(routines, rotation, history)).toBe('push')
+  })
+
+  it('preserves the exact start time and seconds when only the workout details are edited', () => {
+    const workout = makeWorkout({ durationSeconds: 2827 })
+    const timing = getEditedWorkoutTiming(workout, getWorkoutStartDate(workout), 47)
+    expect(timing.startedAt).toBe(workout.startedAt)
+    expect(timing.durationSeconds).toBe(2827)
+    expect(new Date(timing.endedAt).getTime() - new Date(timing.startedAt).getTime()).toBe(2827000)
   })
 })

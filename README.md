@@ -1,37 +1,33 @@
 # The Goy Project
 
-PWA mobile-first para crear rutinas, registrar series, repeticiones, cargas y cardio, y consultar el historial en un calendario.
+PWA para crear rutinas, registrar series y consultar entrenamientos en el calendario.
 
-## Stack
-
-- React 19, TypeScript y Vite
-- Supabase Auth + Postgres para sincronizacion por usuario
-- IndexedDB como cache local y respaldo sin conexion
-- CSS propio, PWA y service worker
-
-The Goy Project comparte cuenta y fila de estado con Keep Slopping. Cada app lee y actualiza solo su propia seccion mediante funciones atomicas de Postgres.
+React 19, TypeScript, Vite y Supabase Auth/Postgres. Ambas apps comparten cuentas, apariencia y una fila de datos por usuario, pero leen y actualizan solo su propia seccion.
 
 ## Desarrollo
 
+Node.js 24 LTS. Configura en `.env.local` las variables de `.env.example`: `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`. Usa una clave publishable/anon, nunca una clave secret/service_role. Sin configuracion se puede trabajar localmente; esos datos no se importan automaticamente a una cuenta.
+
 ```bash
-npm install
+npm ci
 npm run dev
 npm run lint
 npm test
+npx playwright install chromium webkit
+npm run test:e2e
 npm run build
 ```
 
-Variables requeridas en `.env.local`:
+## Persistencia
 
-```text
-VITE_SUPABASE_URL=
-VITE_SUPABASE_ANON_KEY=
-```
+IndexedDB mantiene cache por app y usuario y cambios pendientes. La sincronizacion envia diferencias por registro, verifica el propietario y no sustituye el estado de la otra app. Cerrar sesion limpia los datos visibles y los borradores de esa cuenta.
 
-Ejecuta `supabase/schema.sql` en el SQL Editor del proyecto para crear la tabla, las politicas RLS y las funciones de lectura y escritura parcial.
+Para una instalacion nueva de Supabase, ejecutar primero `supabase/schema.sql` y despues `supabase/migrations/202609050001_incremental_sync.sql` del repositorio The Goy Project. No basta con instalar solo el esquema antiguo. Ambos frontends requieren esa migracion. Las pruebas SQL estan en `supabase/tests/incremental_sync.sql` del mismo repositorio.
 
-## Deploy
+## Publicacion
 
-La version publica se sirve desde la rama `gh-pages`:
+[The Goy Project](https://alexrodarana.github.io/the-goy-project/). Cada push a `main` ejecuta las comprobaciones y publica mediante GitHub Actions. Pages debe estar configurado para GitHub Actions; sus secrets son las dos variables publicas de Supabase indicadas arriba.
 
-https://alexrodarana.github.io/the-goy-project/
+El tema sigue al dispositivo por defecto. El menu de apariencia permite elegir Dispositivo, Claro u Oscuro; el acento es independiente. Los iconos de la suite se encuentran en `public/`.
+
+[Informe de auditoria, validaciones y limites](AUDIT.md).

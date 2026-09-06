@@ -81,9 +81,9 @@ vi.mock('./sampleData', () => ({
   initialState: testState,
 }))
 
-vi.mock('./storage', () => ({
+vi.mock('./storage', async (importOriginal) => ({
+  ...await importOriginal<typeof import('./storage')>(),
   loadLocalState: vi.fn(async () => testState),
-  saveLocalState: vi.fn(async () => undefined),
 }))
 
 vi.mock('./supabase', () => ({

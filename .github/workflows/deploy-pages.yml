@@ -25,14 +25,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Setup Node
         uses: actions/setup-node@v6.4.0
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
       - name: Install dependencies
         run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Unit and integration tests
+        run: npm test
+      - name: Install test browsers
+        run: npx playwright install --with-deps chromium webkit
+      - name: Mobile and desktop tests
+        run: npm run test:e2e
       - name: Build
         run: npm run build
       - name: Configure Pages

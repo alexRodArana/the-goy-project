@@ -3,6 +3,8 @@ import type { AuthChangeEvent, Session } from '@supabase/supabase-js'
 import { initialState } from './sampleData'
 import { normalizeState } from './storage'
 import type { AppState } from './types'
+import { buildStatePatch, hasStateChanges } from './stateSync'
+import { isPublishableKey } from './security'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -20,7 +22,7 @@ const isValidUrl = (value: unknown) => {
   }
 }
 
-const canInitializeSupabase = isValidUrl(supabaseUrl) && Boolean(supabaseAnonKey)
+const canInitializeSupabase = isValidUrl(supabaseUrl) && isPublishableKey(supabaseAnonKey)
 const TRAINING_STATE_KEYS = ['routines', 'routineRotation', 'workouts', 'activeWorkout', 'cardioEnabled']
 
 const getAuthRedirectUrl = () => {
@@ -85,11 +87,12 @@ export const onAuthChange = (callback: (session: Session | null, event: AuthChan
     return () => undefined
   }
 
-  const {
-    data: { subscription },
-  } = supabase.auth.onAuthStateChange((event, session) => callback(session, event))
-
-  return () => subscription.unsubscribe()
+  let disposed = false
+  const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    // Release the auth lock before any listener starts another Supabase request.
+    window.setTimeout(() => { if (!disposed) callback(session, event) }, 0)
+  })
+  return () => { disposed = true; subscription.unsubscribe() }
 }
 
 export const signInWithEmail = async (email: string, password: string) => {
@@ -168,7 +171,7 @@ export const loadRemoteState = async (): Promise<AppState> => {
 
   const { data, error } = await supabase.rpc('get_goy_app_state_sections', {
     p_keys: TRAINING_STATE_KEYS,
-  })
+  }).abortSignal(AbortSignal.timeout(8000))
 
   if (error) {
     throw error
@@ -177,38 +180,16 @@ export const loadRemoteState = async (): Promise<AppState> => {
   return normalizeState(data ?? initialState)
 }
 
-export const saveRemoteState = async (state: AppState, previousState?: AppState) => {
-  if (!supabase) {
-    return
-  }
-
-  const patch: Record<string, unknown> = {}
-  if (!previousState || state.cardioEnabled !== previousState.cardioEnabled) {
-    patch.cardioEnabled = state.cardioEnabled
-  }
-  if (!previousState || state.routineRotation !== previousState.routineRotation) {
-    patch.routineRotation = state.routineRotation
-  }
-  if (!previousState || state.routines !== previousState.routines) {
-    patch.routines = state.routines
-  }
-  if (!previousState || state.workouts !== previousState.workouts) {
-    patch.workouts = state.workouts
-  }
-  if (!previousState || state.activeWorkout !== previousState.activeWorkout) {
-    patch.activeWorkout = state.activeWorkout ?? null
-  }
-
-  if (!Object.keys(patch).length) {
-    return
-  }
-
-  const { error } = await supabase.rpc('merge_goy_app_state', {
-    p_patch: patch,
-    p_remove_keys: ['checkIns'],
-  })
-
-  if (error) {
-    throw error
-  }
+export const saveRemoteState = async (state: AppState, previousState?: AppState, owner?: string) => {
+  if (!supabase) return
+  const changes = buildStatePatch(state, previousState)
+  if (!hasStateChanges(changes)) return
+  if (!owner) throw new Error('No se pudo verificar la cuenta.')
+  const { error } = await supabase.rpc('patch_goy_app_state', {
+    p_section_key: null,
+    p_expected_user_id: owner,
+    p_patch: changes.patch,
+    p_changes: changes.changes,
+  }).abortSignal(AbortSignal.timeout(10000))
+  if (error) throw error
 }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type {
   CSSProperties,
   Dispatch,
@@ -22,21 +22,25 @@ import {
   History,
   KeyRound,
   Mail,
-  Moon,
   Palette,
   Pencil,
   Play,
   Plus,
   Save,
-  Sun,
   Timer,
   Trash2,
   X,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import './App.css'
+import './suite.css'
+import { RotatingPhrase } from './RotatingPhrase'
+import { accentOptions, useAppearance } from './useAppearance'
+import { ThemeButton } from './ThemeButton'
+import { createLocalCache } from './localCache'
+import { useSyncedState } from './useSyncedState'
 import { initialState } from './sampleData'
-import { loadLocalState, saveLocalState } from './storage'
+import { loadLocalState, normalizeState } from './storage'
 import {
   getSession,
   isSupabaseConfigured,
@@ -59,6 +63,7 @@ import {
   formatNumber,
   formatTime,
   getFireLevel,
+  getEditedWorkoutTiming,
   getFlexibleTrainingStreak,
   getNextRoutineId,
   getWorkoutStartDate,
@@ -73,20 +78,11 @@ import type {
   Routine,
   RoutineDraftExercise,
   TabKey,
-  ThemeMode,
   TrainingExercise,
   Workout,
 } from './types'
 
 type RoutineMode = 'home' | 'create' | 'edit'
-
-type AccentColor = 'green' | 'blue' | 'purple' | 'orange' | 'rose'
-
-type AccentOption = {
-  key: AccentColor
-  label: string
-  color: string
-}
 
 type RoutineDraft = {
   name: string
@@ -124,12 +120,6 @@ type FinishSummary = {
 
 const createId = (prefix: string) => `${prefix}-${crypto.randomUUID()}`
 
-const wait = (milliseconds: number) => new Promise((resolve) => window.setTimeout(resolve, milliseconds))
-
-const updateMetaContent = (selector: string, content: string) => {
-  document.querySelector(selector)?.setAttribute('content', content)
-}
-
 const completionMessages = ['Bien hecho.', 'Buen trabajo.', 'Rutina completada.', 'Trabajo limpio.', 'Entreno cerrado.']
 
 const selectInputValue = (event: ReactFocusEvent<HTMLInputElement>) => {
@@ -155,14 +145,6 @@ const navItems: { key: TabKey; label: string; icon: LucideIcon }[] = [
 ]
 
 const brandMarkSrc = `${import.meta.env.BASE_URL}app-icon-192.png`
-const accentOptions: AccentOption[] = [
-  { key: 'green', label: 'Verde', color: '#39b980' },
-  { key: 'blue', label: 'Azul', color: '#2563eb' },
-  { key: 'purple', label: 'Morado', color: '#7c3aed' },
-  { key: 'orange', label: 'Naranja', color: '#d97706' },
-  { key: 'rose', label: 'Rosa', color: '#be185d' },
-]
-
 const trainingPhrases = [
   'Goy mode off, disciplina Judia on.',
   'Del Goy al modo Kosher, una serie a la vez.',
@@ -219,7 +201,7 @@ const createWorkoutDraftExercise = (name = ''): WorkoutDraftExercise => ({
 })
 
 const workoutToDraft = (workout: Workout): WorkoutDraft => ({
-  date: workout.date,
+  date: getWorkoutStartDate(workout),
   routineName: workout.routineName,
   durationMinutes: Math.max(1, Math.round(workout.durationSeconds / 60)),
   exercises: workout.exercises.map((exercise) => ({
@@ -231,9 +213,7 @@ const workoutToDraft = (workout: Workout): WorkoutDraft => ({
 })
 
 const draftToWorkout = (workout: Workout, draft: WorkoutDraft): Workout => {
-  const durationSeconds = Math.max(1, Math.round(Number(draft.durationMinutes) * 60))
-  const startedAt = `${draft.date}T12:00:00.000Z`
-  const endedAt = new Date(new Date(startedAt).getTime() + durationSeconds * 1000).toISOString()
+  const { startedAt, endedAt, durationSeconds } = getEditedWorkoutTiming(workout, draft.date, draft.durationMinutes)
 
   return {
     ...workout,
@@ -315,297 +295,54 @@ const hasCardioEntry = (cardio?: CardioSession) =>
 const formatCardioNumber = (value: number | null | undefined, suffix: string) =>
   value === null || value === undefined ? '--' : `${formatNumber(value)} ${suffix}`
 
-const hasUserData = (value: AppState) =>
-  Boolean(value.routines.length || value.workouts.length || value.activeWorkout)
-
 const vibrate = (pattern: number | number[] = 10) => {
   if ('vibrate' in navigator) {
     navigator.vibrate(pattern)
   }
 }
 
+const syncOptions = {
+  initialState,
+  configured: isSupabaseConfigured,
+  cache: createLocalCache<AppState>('the-goy-project', normalizeState),
+  loadGuest: loadLocalState,
+  getSession,
+  subscribe: onAuthChange,
+  load: loadRemoteState,
+  save: saveRemoteState,
+}
+
 function App() {
-  const [state, setState] = useState<AppState>(initialState)
-  const stateRef = useRef(state)
-  const sessionRef = useRef<SyncSession | null>(null)
-  const authHydrationRef = useRef(0)
-  const initialAuthHandledRef = useRef(false)
-  const isHydratingRef = useRef(false)
-  const remoteSaveQueueRef = useRef<Promise<void>>(Promise.resolve())
-  const remoteSaveRevisionRef = useRef(0)
-  const remoteSyncedStateRef = useRef<AppState | undefined>(undefined)
-  const [isLoaded, setIsLoaded] = useState(false)
-  const [session, setSession] = useState<SyncSession | null>(null)
+  const sync = useSyncedState(syncOptions)
+  return <Workspace key={sync.session?.user.id ?? 'guest'} sync={sync} />
+}
+
+function Workspace({ sync }: { sync: ReturnType<typeof useSyncedState<AppState>> }) {
+  const {
+    state, setState, session, isLoaded, syncStatus, setSyncStatus, syncMessage, setSyncMessage,
+    isPasswordRecovery, setIsPasswordRecovery, hydrateSessionState, retrySync, flush,
+  } = sync
   const [syncEmail, setSyncEmail] = useState('')
   const [syncPassword, setSyncPassword] = useState('')
-  const [syncMessage, setSyncMessage] = useState('')
-  const [syncStatus, setSyncStatus] = useState<'local' | 'loading' | 'synced' | 'sent' | 'error'>('local')
   const [syncCooldown, setSyncCooldown] = useState(0)
-  const [isPasswordRecovery, setIsPasswordRecovery] = useState(() => hasPasswordRecoveryParams())
   const [finishSummary, setFinishSummary] = useState<FinishSummary | null>(null)
   const [isFinishSummaryLeaving, setIsFinishSummaryLeaving] = useState(false)
   const [isWorkoutStarting, setIsWorkoutStarting] = useState(false)
   const [activeTab, setActiveTabState] = useState<TabKey>(() => tabFromHash())
-  const [trainingPhraseIndex, setTrainingPhraseIndex] = useState(() => Math.floor(Math.random() * trainingPhrases.length))
-  const [theme, setTheme] = useState<ThemeMode>(() => {
-    const storedTheme = localStorage.getItem('goy-theme')
-    if (storedTheme === 'dark' || storedTheme === 'light') {
-      return storedTheme
-    }
-    return 'dark'
-  })
-  const [accent, setAccent] = useState<AccentColor>(() => {
-    const storedAccent = localStorage.getItem('goy-accent')
-    return accentOptions.some((option) => option.key === storedAccent) ? (storedAccent as AccentColor) : 'green'
-  })
+  const { themeMode, setThemeMode, accent, setAccent } = useAppearance('goy')
   const [isAccentMenuOpen, setIsAccentMenuOpen] = useState(false)
-  const [selectedRoutineId, setSelectedRoutineId] = useState(initialState.routines[0]?.id ?? '')
+  const [selectedRoutineId, setSelectedRoutineId] = useState('')
   const [trainingMode, setTrainingMode] = useState<RoutineMode>('home')
   const [editingRoutineId, setEditingRoutineId] = useState('')
   const [selectedHistoryId, setSelectedHistoryId] = useState('')
   const [editingWorkoutId, setEditingWorkoutId] = useState('')
   const [routineDraft, setRoutineDraft] = useState<RoutineDraft>(() => routineToDraft())
-  const activeWorkoutId = state.activeWorkout?.id
-  const trainingPhrase = trainingPhrases[trainingPhraseIndex]
-
-  const applyLoadedState = useCallback((savedState: AppState) => {
-    stateRef.current = savedState
-    setState(savedState)
-    setSelectedRoutineId(getNextRoutineId(savedState.routines, savedState.routineRotation, savedState.workouts))
-    setSelectedHistoryId('')
-  }, [])
-
-  const loadRemoteStateWithRetry = useCallback(async () => {
-    try {
-      return await loadRemoteState()
-    } catch (error) {
-      await wait(500)
-      try {
-        return await loadRemoteState()
-      } catch {
-        throw error
-      }
-    }
-  }, [])
-
-  const hydrateSessionState = useCallback(async (nextSession: SyncSession, localState: AppState) => {
-    const token = authHydrationRef.current + 1
-    authHydrationRef.current = token
-    isHydratingRef.current = true
-    setSyncStatus('loading')
-
-    try {
-      const remoteState = await loadRemoteStateWithRetry()
-      if (authHydrationRef.current !== token) {
-        return
-      }
-
-      const shouldBootstrapRemote = !hasUserData(remoteState) && hasUserData(localState)
-      const nextState = shouldBootstrapRemote ? localState : remoteState
-
-      applyLoadedState(nextState)
-      setSession(nextSession)
-      setSyncStatus('synced')
-      setSyncMessage('')
-      try {
-        await saveLocalState(nextState)
-      } catch (error) {
-        console.error('Could not cache remote state locally', error)
-      }
-
-      if (shouldBootstrapRemote) {
-        await saveRemoteState(nextState)
-      }
-      remoteSyncedStateRef.current = nextState
-    } finally {
-      if (authHydrationRef.current === token) {
-        isHydratingRef.current = false
-      }
-    }
-
-  }, [applyLoadedState, loadRemoteStateWithRetry])
-
-  useEffect(() => {
-    let mounted = true
-
-    const loadInitialState = async () => {
-      try {
-        const localState = await loadLocalState()
-
-        if (isSupabaseConfigured) {
-          const currentSession = await getSession()
-          if (!mounted) {
-            return
-          }
-
-          if (currentSession && hasPasswordRecoveryParams()) {
-            setSession(currentSession)
-            setIsPasswordRecovery(true)
-            setSyncPassword('')
-            setSyncStatus('local')
-            setSyncMessage('Escribe tu nueva contraseña.')
-          } else if (currentSession) {
-            await hydrateSessionState(currentSession, localState)
-          } else {
-            setSession(null)
-            applyLoadedState(localState)
-            setSyncStatus('local')
-          }
-        } else {
-          applyLoadedState(localState)
-          setSyncStatus('local')
-        }
-      } catch (error) {
-        console.error('Could not load persisted state', error)
-        if (mounted) {
-          const fallbackState = await loadLocalState()
-          applyLoadedState(fallbackState)
-          setSyncStatus('error')
-          setSyncMessage('No se pudo cargar Supabase.')
-        }
-      } finally {
-        if (mounted) {
-          initialAuthHandledRef.current = true
-          setIsLoaded(true)
-        }
-      }
-    }
-
-    loadInitialState()
-
-    const unsubscribe = onAuthChange(async (nextSession, event) => {
-      if (!initialAuthHandledRef.current) {
-        return
-      }
-
-      if (!nextSession) {
-        authHydrationRef.current += 1
-        isHydratingRef.current = false
-        setSession(null)
-        setSyncStatus('local')
-        setIsPasswordRecovery(false)
-        return
-      }
-
-      try {
-        const localState = stateRef.current
-        if (!mounted) {
-          return
-        }
-        if (event === 'PASSWORD_RECOVERY') {
-          setSession(nextSession)
-          setIsPasswordRecovery(true)
-          setSyncPassword('')
-          setSyncStatus('local')
-          setSyncMessage('Escribe tu nueva contraseña.')
-          return
-        }
-        await hydrateSessionState(nextSession, localState)
-        setSyncPassword('')
-      } catch (error) {
-        console.error('Could not load remote state', error)
-        setSession(nextSession)
-        setSyncStatus('error')
-        setSyncMessage('No se pudo sincronizar.')
-      }
-    })
-
-    return () => {
-      mounted = false
-      unsubscribe()
-    }
-  }, [applyLoadedState, hydrateSessionState])
-
-  useEffect(() => {
-    stateRef.current = state
-  }, [state])
-
-  useEffect(() => {
-    sessionRef.current = session
-  }, [session])
-
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme
-    localStorage.setItem('goy-theme', theme)
-    updateMetaContent('meta[name="theme-color"]', theme === 'dark' ? '#0d0f12' : '#f5f6f8')
-    updateMetaContent('meta[name="apple-mobile-web-app-status-bar-style"]', theme === 'dark' ? 'black-translucent' : 'default')
-  }, [theme])
-
-  useEffect(() => {
-    document.documentElement.dataset.accent = accent
-    localStorage.setItem('goy-accent', accent)
-  }, [accent])
 
   useEffect(() => {
     const syncHash = () => setActiveTabState(tabFromHash())
     window.addEventListener('hashchange', syncHash)
     return () => window.removeEventListener('hashchange', syncHash)
   }, [])
-
-  useEffect(() => {
-    if (!isLoaded || isHydratingRef.current) {
-      return
-    }
-
-    const timeout = window.setTimeout(() => {
-      void saveLocalState(state).catch((error) => {
-        console.error('Could not save local state', error)
-        setSyncStatus('error')
-        setSyncMessage('No se pudo guardar localmente.')
-      })
-    }, 100)
-
-    return () => window.clearTimeout(timeout)
-  }, [isLoaded, state])
-
-  useEffect(() => {
-    if (!isLoaded || isHydratingRef.current) {
-      return
-    }
-
-    if (!session) {
-      remoteSaveRevisionRef.current += 1
-      remoteSyncedStateRef.current = undefined
-      return
-    }
-
-    if (state === remoteSyncedStateRef.current) {
-      return
-    }
-
-    const targetUserId = session.user.id
-    const timeout = window.setTimeout(() => {
-      const revision = remoteSaveRevisionRef.current + 1
-      remoteSaveRevisionRef.current = revision
-      const pendingSave = remoteSaveQueueRef.current.catch(() => undefined).then(async () => {
-        if (sessionRef.current?.user.id !== targetUserId) {
-          return
-        }
-        await saveRemoteState(state, remoteSyncedStateRef.current)
-        if (sessionRef.current?.user.id === targetUserId) {
-          remoteSyncedStateRef.current = state
-        }
-      })
-      remoteSaveQueueRef.current = pendingSave
-
-      void pendingSave
-        .then(() => {
-          if (remoteSaveRevisionRef.current === revision) {
-            setSyncStatus('synced')
-            setSyncMessage('')
-          }
-        })
-        .catch((error) => {
-          if (remoteSaveRevisionRef.current === revision) {
-            console.error('Could not save remote state', error)
-            setSyncStatus('error')
-            setSyncMessage('No se pudo sincronizar.')
-          }
-        })
-    }, 500)
-
-    return () => window.clearTimeout(timeout)
-  }, [isLoaded, session, state])
 
   useEffect(() => {
     if (syncCooldown <= 0) {
@@ -642,18 +379,6 @@ function App() {
     }
   }, [finishSummary])
 
-  useEffect(() => {
-    if (activeTab !== 'training' || trainingMode !== 'home' || activeWorkoutId) {
-      return
-    }
-
-    const interval = window.setInterval(() => {
-      setTrainingPhraseIndex((index) => (index + 1) % trainingPhrases.length)
-    }, 5200)
-
-    return () => window.clearInterval(interval)
-  }, [activeTab, activeWorkoutId, trainingMode])
-
   const sortedWorkouts = useMemo(
     () =>
       [...state.workouts].sort(
@@ -661,7 +386,11 @@ function App() {
       ),
     [state.workouts],
   )
-  const selectedRoutine = state.routines.find((routine) => routine.id === selectedRoutineId) ?? state.routines[0]
+  const suggestedRoutineId = useMemo(
+    () => getNextRoutineId(state.routines, state.routineRotation, sortedWorkouts),
+    [state.routines, state.routineRotation, sortedWorkouts],
+  )
+  const selectedRoutine = state.routines.find((routine) => routine.id === (selectedRoutineId || suggestedRoutineId)) ?? state.routines[0]
   const selectedHistoryWorkout = sortedWorkouts.find((workout) => workout.id === selectedHistoryId)
   const activeRoutineId = state.activeWorkout?.routineId
   const activeRoutineName = state.activeWorkout?.routineName
@@ -756,7 +485,7 @@ function App() {
         await updatePassword(syncPassword)
         const currentSession = await getSession()
         if (currentSession) {
-          await hydrateSessionState(currentSession, stateRef.current)
+          await hydrateSessionState(currentSession, true)
         }
         setIsPasswordRecovery(false)
         setSyncPassword('')
@@ -814,12 +543,15 @@ function App() {
   }
 
   const disconnectSync = async () => {
-    authHydrationRef.current += 1
-    isHydratingRef.current = false
-    await signOut()
-    setSession(null)
-    setSyncStatus('local')
-    setSyncPassword('')
+    if (!window.confirm('¿Cerrar sesión en este dispositivo?')) return
+    try {
+      await flush()
+      await signOut()
+      setSyncPassword('')
+    } catch {
+      setSyncStatus('error')
+      setSyncMessage('No se pudo cerrar sesión. Inténtalo de nuevo.')
+    }
   }
 
   const saveRoutine = (event: FormEvent<HTMLFormElement>) => {
@@ -828,7 +560,7 @@ function App() {
       .map((exercise) => ({
         id: exercise.id.startsWith('draft-exercise') ? createId('routine-exercise') : exercise.id,
         name: exercise.name.trim(),
-        sets: Math.max(1, Number(exercise.sets)),
+        sets: Math.min(30, Math.max(1, Math.trunc(Number(exercise.sets)) || 1)),
       }))
       .filter((exercise) => exercise.name)
 
@@ -1098,19 +830,7 @@ function App() {
               </div>
             )}
           </div>
-          <button
-            aria-label={theme === 'dark' ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'}
-            className="icon-button"
-            data-tooltip={theme === 'dark' ? 'Tema claro' : 'Tema oscuro'}
-            type="button"
-            onClick={() => {
-              vibrate(8)
-              setIsAccentMenuOpen(false)
-              setTheme((current) => (current === 'dark' ? 'light' : 'dark'))
-            }}
-          >
-            {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-          </button>
+          <ThemeButton mode={themeMode} onChange={setThemeMode} />
         </div>
       </header>
 
@@ -1133,6 +853,12 @@ function App() {
       </nav>
 
       <main className={mainClassName}>
+        {!isLoaded && <div className="loading-view" role="status">Cargando entrenamientos</div>}
+        {session && syncStatus === 'error' && (
+          <button className="sync-alert" type="button" onClick={() => void retrySync()} role="status">
+            <Cloud size={16} /><span>{syncMessage}</span><span>Reintentar</span>
+          </button>
+        )}
         <SyncPanel
           email={syncEmail}
           isConfigured={isSupabaseConfigured}
@@ -1161,7 +887,7 @@ function App() {
           />
         )}
 
-        {activeTab === 'training' && (
+        {isLoaded && activeTab === 'training' && (
           <TrainingView
             activeWorkout={state.activeWorkout}
             cardioEnabled={state.cardioEnabled}
@@ -1176,9 +902,8 @@ function App() {
             routines={state.routines}
             saveRoutine={saveRoutine}
             selectedRoutine={selectedRoutine}
-            selectedRoutineId={selectedRoutineId}
+            selectedRoutineId={selectedRoutine?.id ?? ''}
             isWorkoutStarting={isWorkoutStarting}
-            trainingPhrase={trainingPhrase}
             setMode={setTrainingMode}
             setRoutineDraft={setRoutineDraft}
             setSelectedRoutineId={setSelectedRoutineId}
@@ -1188,7 +913,7 @@ function App() {
           />
         )}
 
-        {activeTab === 'history' && (
+        {isLoaded && activeTab === 'history' && (
           <HistoryView
             deleteWorkout={deleteWorkout}
             editingWorkoutId={editingWorkoutId}
@@ -1234,7 +959,6 @@ function TrainingView({
   saveRoutine,
   selectedRoutine,
   selectedRoutineId,
-  trainingPhrase,
   setMode,
   setRoutineDraft,
   setSelectedRoutineId,
@@ -1257,7 +981,6 @@ function TrainingView({
   saveRoutine: (event: FormEvent<HTMLFormElement>) => void
   selectedRoutine?: Routine
   selectedRoutineId: string
-  trainingPhrase: string
   setMode: Dispatch<SetStateAction<RoutineMode>>
   setRoutineDraft: Dispatch<SetStateAction<RoutineDraft>>
   setSelectedRoutineId: Dispatch<SetStateAction<string>>
@@ -1631,14 +1354,12 @@ function TrainingView({
 
   return (
     <section className="training-home enter">
-      <h1 className="training-phrase" key={trainingPhrase}>
-        {trainingPhrase}
-      </h1>
+      <RotatingPhrase className="training-phrase" phrases={trainingPhrases} />
       <div className="surface start-card">
         {routines.length ? (
           <>
             <div className="routine-picker">
-              <select value={selectedRoutineId} onChange={(event) => setSelectedRoutineId(event.target.value)}>
+              <select aria-label="Rutina" value={selectedRoutineId} onChange={(event) => setSelectedRoutineId(event.target.value)}>
                 {routines.map((routine) => (
                   <option key={routine.id} value={routine.id}>
                     {routine.name}
@@ -1754,7 +1475,7 @@ function SyncPanel({
     return (
       <section className="sync-panel muted">
         <Cloud size={17} />
-        <span>Supabase pendiente</span>
+        <span>En este dispositivo</span>
       </section>
     )
   }
@@ -1810,7 +1531,7 @@ function SyncPanel({
       <button className="secondary-button compact" disabled={status === 'loading' || syncCooldown > 0} type="submit" value="signup">
         Crear
       </button>
-      <button className="ghost-button compact" disabled={status === 'loading' || syncCooldown > 0} type="submit" value="reset">
+      <button className="ghost-button compact" disabled={status === 'loading' || syncCooldown > 0} formNoValidate type="submit" value="reset">
         Recuperar
       </button>
       {message && <small>{message}</small>}

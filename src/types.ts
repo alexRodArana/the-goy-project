@@ -1,6 +1,5 @@
 export type TabKey = 'training' | 'history'
 
-export type ThemeMode = 'light' | 'dark'
 
 export type RoutineExercise = {
   id: string
