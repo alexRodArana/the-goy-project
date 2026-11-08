@@ -203,6 +203,12 @@ p {
   text-align: center;
 }
 .error-screen h1 { font-size: 22px; }
+.error-screen p {
+  max-width: 360px;
+  color: var(--muted);
+  font-size: 14px;
+}
+.error-screen > div { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
 .error-screen button {
   min-height: 44px;
   padding: 10px 24px;
@@ -213,6 +219,12 @@ p {
   font: inherit;
   cursor: pointer;
 }
+.error-screen button.secondary {
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+}
+.error-screen button:disabled { cursor: wait; opacity: 0.65; }
 
 @media (max-width: 620px) {
   :root {

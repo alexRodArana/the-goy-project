@@ -10,7 +10,10 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:production": "node scripts/check-production.mjs",
+    "verify": "npm run lint && npm test && npm run test:e2e && npm run build && npm run test:production",
+    "deploy": "npm run verify && node scripts/publish-pages.mjs"
   },
   "dependencies": {
     "@fontsource-variable/manrope": "^5.3.0",

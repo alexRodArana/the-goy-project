@@ -19,6 +19,7 @@ self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
     const keys = await caches.keys()
     await Promise.all(keys.filter((key) => key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME).map((key) => caches.delete(key)))
+    if (self.registration.navigationPreload) await self.registration.navigationPreload.enable()
     await self.clients.claim()
   })())
 })
@@ -33,7 +34,9 @@ self.addEventListener('fetch', (event) => {
     const cached = await cache.match(key)
     if (!navigation && cached) return cached
     try {
-      const response = await fetch(event.request)
+      const preloaded = navigation ? await event.preloadResponse : undefined
+      const response = preloaded ?? await fetch(event.request, navigation ? { cache: 'no-store' } : undefined)
+      if (!response.ok && cached) return cached
       if (response.ok && response.type === 'basic') {
         event.waitUntil(cache.put(key, response.clone()))
       }

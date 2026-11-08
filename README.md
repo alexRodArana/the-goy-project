@@ -26,7 +26,9 @@ Para una instalacion nueva de Supabase, ejecutar primero `supabase/schema.sql` y
 
 ## Publicacion
 
-[The Goy Project](https://alexrodarana.github.io/the-goy-project/). Cada push a `main` ejecuta las comprobaciones y publica mediante GitHub Actions. Pages debe estar configurado para GitHub Actions; sus secrets son las dos variables publicas de Supabase indicadas arriba.
+[The Goy Project](https://alexrodarana.github.io/the-goy-project/). La cuenta de GitHub no puede iniciar runners hospedados, por lo que la publicacion usa la rama generada `gh-pages` y no depende de Actions. Pages debe estar configurado con `gh-pages` y `/(root)`.
+
+`npm run deploy` ejecuta lint, pruebas unitarias, la matriz movil/escritorio, el build y una comprobacion del service worker en Chromium/WebKit antes de actualizar `gh-pages`. La configuracion publica de Supabase se toma de `.env.local`; nunca uses una clave secret o `service_role`.
 
 El tema sigue al dispositivo por defecto. El menu de apariencia permite elegir Dispositivo, Claro u Oscuro; el acento es independiente. Los iconos de la suite se encuentran en `public/`.
 
